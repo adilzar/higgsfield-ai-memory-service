@@ -20,6 +20,10 @@ _Avoid_: Cleanup, cascade logic
 Startup work that prepares the Memory Service process before it handles requests, including database schema initialization and embedding model warmup.
 _Avoid_: Lifespan setup, app startup glue
 
+**App Assembly**:
+FastAPI process construction: lifespan registration, middleware registration, and route registration before serving requests.
+_Avoid_: Main module, app glue
+
 **Recall**:
 The process that selects stored Memory and recent Turn evidence, then formats Context for the next agent turn.
 _Avoid_: Retrieval, search, lookup
