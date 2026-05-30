@@ -71,8 +71,7 @@ async def _hybrid_search(
         "limit": limit,
     }
 
-    vector_sql = sa_text(
-        f"""
+    vector_sql = sa_text(f"""
         SELECT id, type, key, value, confidence, session_id, source_turn_id, created_at, updated_at,
                active, supersedes, superseded_by,
                1 - (embedding <=> CAST(:embedding AS vector)) as vec_score
@@ -80,13 +79,11 @@ async def _hybrid_search(
         WHERE {where}
         ORDER BY embedding <=> CAST(:embedding AS vector)
         LIMIT :limit
-    """
-    )
+    """)
     vec_result = await db.execute(vector_sql, params)
     vec_rows = [dict(row) for row in vec_result.mappings().all()]
 
-    fts_sql = sa_text(
-        f"""
+    fts_sql = sa_text(f"""
         SELECT id, type, key, value, confidence, session_id, source_turn_id, created_at, updated_at,
                active, supersedes, superseded_by,
                ts_rank(to_tsvector('english', value), plainto_tsquery('english', :query)) as fts_score
@@ -95,8 +92,7 @@ async def _hybrid_search(
           AND to_tsvector('english', value) @@ plainto_tsquery('english', :query)
         ORDER BY fts_score DESC
         LIMIT :limit
-    """
-    )
+    """)
     fts_result = await db.execute(fts_sql, params)
     fts_rows = [dict(row) for row in fts_result.mappings().all()]
 

@@ -9,11 +9,9 @@ from src.extraction import (
 
 
 def test_parse_response_accepts_json_markdown_fence():
-    memories = parse_extraction_response(
-        """```json
+    memories = parse_extraction_response("""```json
 [{"type":"fact","key":"location","value":"Lives in Berlin","confidence":0.9}]
-```"""
-    )
+```""")
 
     assert memories == [
         ExtractedMemory(type="fact", key="location", value="Lives in Berlin", confidence=0.9)
@@ -21,14 +19,12 @@ def test_parse_response_accepts_json_markdown_fence():
 
 
 def test_parse_response_filters_malformed_memory_items():
-    memories = parse_extraction_response(
-        """[
+    memories = parse_extraction_response("""[
             {"type":"fact","key":"employment","value":"Works at Notion","confidence":0.9},
             {"type":"fact","key":"location"},
             {"type":"fact","key":"age","value":42},
             "not an object"
-        ]"""
-    )
+        ]""")
 
     assert memories == [
         ExtractedMemory(type="fact", key="employment", value="Works at Notion", confidence=0.9)
@@ -41,8 +37,7 @@ def test_parse_response_rejects_non_array_json():
 
 
 def test_parse_response_normalizes_optional_fields():
-    memories = parse_extraction_response(
-        """[
+    memories = parse_extraction_response("""[
             {
                 "type":"profile",
                 "key":17,
@@ -50,8 +45,7 @@ def test_parse_response_normalizes_optional_fields():
                 "confidence":1.7,
                 "supersedes_key":"  location  "
             }
-        ]"""
-    )
+        ]""")
 
     assert memories == [
         ExtractedMemory(

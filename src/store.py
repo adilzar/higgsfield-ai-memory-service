@@ -30,30 +30,26 @@ async def fetch_scope_memories(
     include_inactive: bool = False,
 ) -> list[dict]:
     active_clause = "" if include_inactive else "AND active = true"
-    sql = sa_text(
-        f"""
+    sql = sa_text(f"""
         SELECT id, type, key, value, confidence, session_id, source_turn_id, created_at, updated_at,
                active, supersedes, superseded_by
         FROM memories
         WHERE (user_id = :user_id OR (:user_id IS NULL AND session_id = :session_id))
           {active_clause}
         ORDER BY active DESC, created_at DESC
-    """
-    )
+    """)
     result = await db.execute(sql, {"user_id": user_id, "session_id": session_id})
     return [dict(r) for r in result.mappings().all()]
 
 
 async def fetch_recent_turns(db: AsyncSession, session_id: str, limit: int = 5) -> list[dict]:
-    sql = sa_text(
-        """
+    sql = sa_text("""
         SELECT id, content_text, timestamp
         FROM turns
         WHERE session_id = :session_id
         ORDER BY timestamp DESC
         LIMIT :limit
-    """
-    )
+    """)
     result = await db.execute(sql, {"session_id": session_id, "limit": limit})
     return [dict(r) for r in result.mappings().all()]
 
