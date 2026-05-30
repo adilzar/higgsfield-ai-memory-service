@@ -1,0 +1,153 @@
+{
+  "conversations": [
+    {
+      "description": "User introduces themselves and shares basic facts",
+      "turns": [
+        {
+          "session_id": "session-1",
+          "user_id": "test-user-1",
+          "messages": [
+            {"role": "user", "content": "Hi! I'm a software engineer at Stripe. I live in San Francisco with my dog Biscuit."},
+            {"role": "assistant", "content": "Nice to meet you! San Francisco is a great city for tech. What kind of dog is Biscuit?"}
+          ],
+          "timestamp": "2025-03-01T10:00:00Z"
+        },
+        {
+          "session_id": "session-1",
+          "user_id": "test-user-1",
+          "messages": [
+            {"role": "user", "content": "Biscuit is a golden retriever. I'm vegetarian by the way, and allergic to shellfish. Could you keep that in mind?"},
+            {"role": "assistant", "content": "Got it! I'll remember that Biscuit is a golden retriever, and I'll keep your dietary needs in mind — vegetarian, no shellfish."}
+          ],
+          "timestamp": "2025-03-01T10:05:00Z"
+        }
+      ]
+    },
+    {
+      "description": "User shares preferences and works on a technical problem",
+      "turns": [
+        {
+          "session_id": "session-2",
+          "user_id": "test-user-1",
+          "messages": [
+            {"role": "user", "content": "I prefer concise, direct answers. No fluff please. I'm debugging a React performance issue — excessive re-renders in a dashboard component."},
+            {"role": "assistant", "content": "Understood. For the re-render issue: check if you're passing new object/array references on each render. Use React.memo, useMemo, or useCallback to stabilize props."}
+          ],
+          "timestamp": "2025-03-10T14:00:00Z"
+        }
+      ]
+    },
+    {
+      "description": "User updates employment — fact evolution",
+      "turns": [
+        {
+          "session_id": "session-3",
+          "user_id": "test-user-1",
+          "messages": [
+            {"role": "user", "content": "Big news — I just started at Notion as a PM! Career change from engineering to product."},
+            {"role": "assistant", "content": "Congratulations on the move to Notion! That's a big shift from engineering at Stripe to product management. How's the transition going?"}
+          ],
+          "timestamp": "2025-03-15T09:00:00Z"
+        }
+      ]
+    },
+    {
+      "description": "User updates location — fact evolution",
+      "turns": [
+        {
+          "session_id": "session-4",
+          "user_id": "test-user-1",
+          "messages": [
+            {"role": "user", "content": "I just moved to Berlin from SF last month. Loving it so far. Walking Biscuit along the Spree every morning."},
+            {"role": "assistant", "content": "Berlin is wonderful! The Spree walks sound lovely for you and Biscuit. How are you finding the city compared to SF?"}
+          ],
+          "timestamp": "2025-04-01T08:00:00Z"
+        }
+      ]
+    },
+    {
+      "description": "Opinion evolution on TypeScript",
+      "turns": [
+        {
+          "session_id": "session-2",
+          "user_id": "test-user-1",
+          "messages": [
+            {"role": "user", "content": "I love TypeScript. It's the best thing to happen to frontend development."},
+            {"role": "assistant", "content": "TypeScript has definitely transformed how we write JavaScript. The type safety catches so many bugs at compile time."}
+          ],
+          "timestamp": "2025-03-10T15:00:00Z"
+        },
+        {
+          "session_id": "session-5",
+          "user_id": "test-user-1",
+          "messages": [
+            {"role": "user", "content": "TypeScript generics are getting really annoying. The type gymnastics for simple things is exhausting."},
+            {"role": "assistant", "content": "Yeah, complex generic types can feel like solving puzzles that don't add much value. Any specific patterns giving you trouble?"}
+          ],
+          "timestamp": "2025-04-10T11:00:00Z"
+        },
+        {
+          "session_id": "session-6",
+          "user_id": "test-user-1",
+          "messages": [
+            {"role": "user", "content": "I think TypeScript is fine for big projects but I'd use Python for scripts and quick prototypes. It's not worth the overhead for small things."},
+            {"role": "assistant", "content": "That's a pragmatic take. TypeScript's value really shines in larger codebases where the type system prevents integration bugs."}
+          ],
+          "timestamp": "2025-04-20T16:00:00Z"
+        }
+      ]
+    }
+  ],
+  "probes": [
+    {
+      "query": "Where does this user live?",
+      "session_id": "probe-1",
+      "user_id": "test-user-1",
+      "expected_facts": ["Berlin"],
+      "should_not_contain": ["San Francisco as current"]
+    },
+    {
+      "query": "Where does the user work?",
+      "session_id": "probe-2",
+      "user_id": "test-user-1",
+      "expected_facts": ["Notion", "PM"],
+      "should_not_contain": ["Stripe as current"]
+    },
+    {
+      "query": "What's their dog's name?",
+      "session_id": "probe-3",
+      "user_id": "test-user-1",
+      "expected_facts": ["Biscuit"]
+    },
+    {
+      "query": "What are the user's dietary restrictions?",
+      "session_id": "probe-4",
+      "user_id": "test-user-1",
+      "expected_facts": ["vegetarian", "shellfish"]
+    },
+    {
+      "query": "What does the user think about TypeScript?",
+      "session_id": "probe-5",
+      "user_id": "test-user-1",
+      "expected_facts": ["fine for big projects", "Python for scripts"]
+    },
+    {
+      "query": "What city does the user with the dog named Biscuit live in?",
+      "session_id": "probe-6",
+      "user_id": "test-user-1",
+      "expected_facts": ["Berlin"]
+    },
+    {
+      "query": "What is the user's favorite programming language?",
+      "session_id": "probe-7",
+      "user_id": "test-user-1",
+      "expected_facts": ["TypeScript", "Python"]
+    },
+    {
+      "query": "Tell me about the user's career history",
+      "session_id": "probe-8",
+      "user_id": "test-user-1",
+      "expected_facts": ["Notion", "Stripe"]
+    }
+  ]
+}
