@@ -5,6 +5,7 @@ import re
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.budget import assemble_context
 from src.embeddings import embed_text
 from src.store import fetch_recent_turns, fetch_scope_memories, hybrid_search_memories
 
@@ -80,91 +81,6 @@ async def build_recall_context(
 
     recent = await fetch_recent_turns(db, session_id)
     return assemble_context(memories, recent, max_tokens)
-
-
-def assemble_context(
-    memories: list[dict], recent_turns: list[dict], max_tokens: int
-) -> tuple[str, list[dict]]:
-    """Assemble context string with tiered priority, respecting token budget."""
-    # Approximate tokens as words * 1.3
-    def estimate_tokens(text: str) -> int:
-        return int(len(text.split()) * 1.3)
-
-    budget = max_tokens
-    sections = []
-    citations = []
-
-    # Tier 1: Stable facts
-    facts = [m for m in memories if m["type"] == "fact"]
-    # Tier 2: Preferences
-    preferences = [m for m in memories if m["type"] == "preference"]
-    # Tier 3: Other query-relevant (opinions, events)
-    others = [m for m in memories if m["type"] in ("opinion", "event")]
-
-    # Build facts section
-    fact_lines = []
-    for m in facts[:15]:  # cap at 15 facts
-        line = f"- {m['value']}"
-        if m.get("active") is False:
-            line = f"- Previously: {m['value']}"
-        elif m.get("updated_at"):
-            line += f" (updated {str(m['updated_at'])[:10]})"
-        cost = estimate_tokens(line)
-        if budget - cost < 0:
-            break
-        budget -= cost
-        fact_lines.append(line)
-        citations.append({"turn_id": m["source_turn_id"], "score": m.get("rrf_score", 0), "snippet": m["value"]})
-
-    if fact_lines:
-        sections.append("## Known facts about this user\n" + "\n".join(fact_lines))
-
-    # Build preferences section
-    pref_lines = []
-    for m in preferences[:10]:
-        line = f"- {m['value']}"
-        cost = estimate_tokens(line)
-        if budget - cost < 0:
-            break
-        budget -= cost
-        pref_lines.append(line)
-        citations.append({"turn_id": m["source_turn_id"], "score": m.get("rrf_score", 0), "snippet": m["value"]})
-
-    if pref_lines:
-        sections.append("## Preferences\n" + "\n".join(pref_lines))
-
-    # Build relevant memories section
-    other_lines = []
-    for m in others[:10]:
-        line = f"- [{str(m.get('created_at', ''))[:10]}] {m['value']}"
-        cost = estimate_tokens(line)
-        if budget - cost < 0:
-            break
-        budget -= cost
-        other_lines.append(line)
-        citations.append({"turn_id": m["source_turn_id"], "score": m.get("rrf_score", 0), "snippet": m["value"]})
-
-    if other_lines:
-        sections.append("## Relevant memories\n" + "\n".join(other_lines))
-
-    # Tier 4: Recent conversation context
-    recent_lines = []
-    for t in recent_turns:
-        text = t["content_text"][:200]
-        line = f"- [{str(t.get('timestamp', ''))[:10]}] {text}"
-        cost = estimate_tokens(line)
-        if budget - cost < 0:
-            break
-        budget -= cost
-        recent_lines.append(line)
-        citations.append({"turn_id": t["id"], "score": 0.0, "snippet": text[:100]})
-
-    if recent_lines:
-        sections.append("## Recent conversation context\n" + "\n".join(recent_lines))
-
-    context = "\n\n".join(sections)
-    return context, citations
-
 
 def _select_recall_memories(query: str, retrieved: list[dict], scope_memories: list[dict]) -> list[dict]:
     query_tokens = _tokens(query)
