@@ -14,8 +14,8 @@ from src.api_models import (
     format_user_memories,
 )
 from src.auth import enforce_memory_auth
-from src.database import get_db, init_db
-from src.embeddings import embed_text
+from src.bootstrap import initialize_service
+from src.database import get_db
 from src.intake import ingest_turn
 from src.lifecycle import delete_session_data, delete_user_data
 from src.recall import build_recall_context
@@ -23,15 +23,11 @@ from src.search import search_memories
 from src.store import fetch_user_memory_models
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_db()
-    # Warm up embedding model
-    embed_text("warmup")
-    logger.info("Memory service ready")
+    await initialize_service()
     yield
 
 

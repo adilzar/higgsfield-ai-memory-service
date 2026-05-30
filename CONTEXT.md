@@ -16,6 +16,10 @@ _Avoid_: Raw chunk, note, embedding record
 Rules that preserve Memory active state and supersession links when Turns, Sessions, or Users are deleted.
 _Avoid_: Cleanup, cascade logic
 
+**Service Bootstrap**:
+Startup work that prepares the Memory Service process before it handles requests, including database schema initialization and embedding model warmup.
+_Avoid_: Lifespan setup, app startup glue
+
 **Recall**:
 The process that selects stored Memory and recent Turn evidence, then formats Context for the next agent turn.
 _Avoid_: Retrieval, search, lookup
