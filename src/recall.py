@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -93,6 +94,14 @@ STABLE_INTENTS = {"location", "employment", "pet", "diet", "communication_style"
 HISTORY_TERMS = {"history", "previous", "previously", "past", "former", "before"}
 
 
+@dataclass(frozen=True)
+class RecallContextCommand:
+    query: str
+    session_id: str
+    user_id: str | None
+    max_tokens: int
+
+
 async def hybrid_retrieve(
     db: AsyncSession, query: str, user_id: str | None, session_id: str, limit: int = 20
 ) -> list[dict]:
@@ -103,22 +112,21 @@ async def hybrid_retrieve(
 
 async def build_recall_context(
     db: AsyncSession,
-    query: str,
-    user_id: str | None,
-    session_id: str,
-    max_tokens: int,
+    cmd: RecallContextCommand,
 ) -> tuple[str, list[dict]]:
     """Build prompt Context and Citations for /recall."""
-    include_inactive = _needs_history(query)
-    retrieved = await hybrid_retrieve(db, query, user_id, session_id)
-    scope_memories = await fetch_scope_memories(db, user_id, session_id, include_inactive)
-    memories = _select_recall_memories(query, retrieved, scope_memories)
+    include_inactive = _needs_history(cmd.query)
+    retrieved = await hybrid_retrieve(db, cmd.query, cmd.user_id, cmd.session_id)
+    scope_memories = await fetch_scope_memories(
+        db, cmd.user_id, cmd.session_id, include_inactive
+    )
+    memories = _select_recall_memories(cmd.query, retrieved, scope_memories)
 
     if not memories:
         return "", []
 
-    recent = await fetch_recent_turns(db, session_id)
-    return assemble_context(memories, recent, max_tokens)
+    recent = await fetch_recent_turns(db, cmd.session_id)
+    return assemble_context(memories, recent, cmd.max_tokens)
 
 
 def _select_recall_memories(

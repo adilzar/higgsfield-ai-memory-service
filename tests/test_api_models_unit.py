@@ -1,7 +1,67 @@
 from datetime import datetime
 from types import SimpleNamespace
 
-from src.api_models import format_timestamp, format_user_memories
+from src.api_models import (
+    RecallRequest,
+    SearchRequest,
+    TurnRequest,
+    format_timestamp,
+    format_user_memories,
+)
+from src.intake import IngestTurnCommand, TurnMessage
+from src.recall import RecallContextCommand
+from src.search import SearchMemoriesCommand
+
+
+def test_turn_request_builds_ingest_command():
+    request = TurnRequest(
+        session_id="session-1",
+        user_id="user-1",
+        messages=[
+            {"role": "user", "content": "I work at Stripe."},
+            {"role": "tool", "content": "{}", "name": "lookup"},
+        ],
+        timestamp="2025-05-01T10:00:00Z",
+        metadata={"source": "test"},
+    )
+
+    assert request.to_command() == IngestTurnCommand(
+        session_id="session-1",
+        user_id="user-1",
+        messages=[
+            TurnMessage(role="user", content="I work at Stripe.", name=None),
+            TurnMessage(role="tool", content="{}", name="lookup"),
+        ],
+        timestamp="2025-05-01T10:00:00Z",
+        metadata={"source": "test"},
+    )
+
+
+def test_recall_request_builds_recall_command():
+    request = RecallRequest(
+        query="Where does the user work?",
+        session_id="session-1",
+        user_id="user-1",
+        max_tokens=512,
+    )
+
+    assert request.to_command() == RecallContextCommand(
+        query="Where does the user work?",
+        session_id="session-1",
+        user_id="user-1",
+        max_tokens=512,
+    )
+
+
+def test_search_request_builds_search_command():
+    request = SearchRequest(query="favorite color", user_id="user-1", limit=5)
+
+    assert request.to_command() == SearchMemoriesCommand(
+        query="favorite color",
+        user_id="user-1",
+        session_id=None,
+        limit=5,
+    )
 
 
 def test_format_user_memories_preserves_public_contract():

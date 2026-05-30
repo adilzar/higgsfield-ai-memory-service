@@ -5,17 +5,22 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api_models import UserMemoriesResponse, format_user_memories
+from src.api_models import (
+    RecallRequest,
+    SearchRequest,
+    TurnRequest,
+    UserMemoriesResponse,
+    format_user_memories,
+)
 from src.config import settings
 from src.database import get_db, init_db
 from src.embeddings import embed_text
-from src.intake import IngestTurnCommand, TurnMessage, ingest_turn
+from src.intake import ingest_turn
 from src.lifecycle import delete_session_data, delete_user_data
 from src.recall import build_recall_context
-from src.search import SearchMemoriesCommand, search_memories
+from src.search import search_memories
 from src.store import fetch_user_memory_models
 
 logging.basicConfig(level=logging.INFO)
@@ -44,35 +49,6 @@ async def auth_middleware(request: Request, call_next):
     return await call_next(request)
 
 
-# --- Request Models ---
-class Message(BaseModel):
-    role: str
-    content: str
-    name: str | None = None
-
-
-class TurnRequest(BaseModel):
-    session_id: str
-    user_id: str | None = None
-    messages: list[Message]
-    timestamp: str | None = None
-    metadata: dict | None = None
-
-
-class RecallRequest(BaseModel):
-    query: str
-    session_id: str
-    user_id: str | None = None
-    max_tokens: int = Field(default=1024, gt=0)
-
-
-class SearchRequest(BaseModel):
-    query: str
-    session_id: str | None = None
-    user_id: str | None = None
-    limit: int = Field(default=10, gt=0)
-
-
 # --- Endpoints ---
 @app.get("/health")
 async def health():
@@ -81,38 +57,19 @@ async def health():
 
 @app.post("/turns", status_code=201)
 async def create_turn(req: TurnRequest, db: AsyncSession = Depends(get_db)):
-    turn_id = await ingest_turn(
-        db,
-        IngestTurnCommand(
-            session_id=req.session_id,
-            user_id=req.user_id,
-            messages=[TurnMessage(m.role, m.content, m.name) for m in req.messages],
-            timestamp=req.timestamp,
-            metadata=req.metadata,
-        ),
-    )
+    turn_id = await ingest_turn(db, req.to_command())
     return {"id": turn_id}
 
 
 @app.post("/recall")
 async def recall(req: RecallRequest, db: AsyncSession = Depends(get_db)):
-    context, citations = await build_recall_context(
-        db, req.query, req.user_id, req.session_id, req.max_tokens
-    )
+    context, citations = await build_recall_context(db, req.to_command())
     return {"context": context, "citations": citations}
 
 
 @app.post("/search")
 async def search(req: SearchRequest, db: AsyncSession = Depends(get_db)):
-    results = await search_memories(
-        db,
-        SearchMemoriesCommand(
-            query=req.query,
-            user_id=req.user_id,
-            session_id=req.session_id,
-            limit=req.limit,
-        ),
-    )
+    results = await search_memories(db, req.to_command())
     return {"results": results}
 
 
