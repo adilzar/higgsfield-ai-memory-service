@@ -44,7 +44,7 @@ STOPWORDS = {
 
 INTENT_TERMS = {
     "location": {"where", "live", "lives", "city", "moved", "home", "reside", "living"},
-    "employment": {"work", "works", "job", "career", "employer", "company", "role", "pm", "engineer", "designer"},
+    "employment": {"work", "works", "job", "career", "employer", "company", "role", "pm", "engineer", "designer", "do", "occupation"},
     "pet": {"dog", "cat", "pet", "pets", "biscuit"},
     "diet": {"diet", "dietary", "vegetarian", "shellfish", "allergy", "allergic", "food", "eat"},
     "communication_style": {"concise", "direct", "answers", "style", "prefer", "preference", "fluff"},
@@ -177,7 +177,7 @@ def _memory_intents(memory: dict) -> set[str]:
 
     if any(part in key for part in ("location", "city", "home", "moved")):
         intents.add("location")
-    if any(part in key for part in ("employment", "career", "job", "work", "company")):
+    if any(part in key for part in ("employment", "career", "job", "work", "company", "occupation", "role")):
         intents.add("employment")
     if any(part in key for part in ("pet", "dog", "cat")):
         intents.add("pet")
@@ -200,6 +200,8 @@ def _is_profile_query(query: str, query_intents: set[str]) -> bool:
     if {"remember", "know"} & tokens and {"me", "user"} & tokens and not query_intents:
         return True
     if "everything" in tokens and {"me", "user"} & tokens:
+        return True
+    if {"tell", "about"} <= tokens and {"me", "user"} & tokens and not query_intents:
         return True
     return False
 
