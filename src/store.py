@@ -189,6 +189,17 @@ async def fetch_user_memory_models(db: AsyncSession, user_id: str) -> list[Memor
 
 
 async def delete_session_data(db: AsyncSession, session_id: str) -> None:
+    # Reactivate memories that were superseded by memories in this session
+    await db.execute(
+        sa_text("""
+            UPDATE memories SET active = true, superseded_by = NULL
+            WHERE id IN (
+                SELECT supersedes FROM memories
+                WHERE session_id = :session_id AND supersedes IS NOT NULL
+            )
+        """),
+        {"session_id": session_id},
+    )
     await db.execute(delete(Memory).where(Memory.session_id == session_id))
     await db.execute(delete(Turn).where(Turn.session_id == session_id))
     await db.commit()
