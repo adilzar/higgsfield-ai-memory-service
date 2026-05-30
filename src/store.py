@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy import text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -187,31 +187,6 @@ async def fetch_user_memory_models(db: AsyncSession, user_id: str) -> list[Memor
         select(Memory).where(Memory.user_id == user_id).order_by(Memory.created_at.desc())
     )
     return list(result.scalars().all())
-
-
-async def delete_session_data(db: AsyncSession, session_id: str) -> None:
-    # Reactivate memories that were superseded by memories in this session
-    await db.execute(
-        sa_text(
-            """
-            UPDATE memories SET active = true, superseded_by = NULL
-            WHERE id IN (
-                SELECT supersedes FROM memories
-                WHERE session_id = :session_id AND supersedes IS NOT NULL
-            )
-        """
-        ),
-        {"session_id": session_id},
-    )
-    await db.execute(delete(Memory).where(Memory.session_id == session_id))
-    await db.execute(delete(Turn).where(Turn.session_id == session_id))
-    await db.commit()
-
-
-async def delete_user_data(db: AsyncSession, user_id: str) -> None:
-    await db.execute(delete(Memory).where(Memory.user_id == user_id))
-    await db.execute(delete(Turn).where(Turn.user_id == user_id))
-    await db.commit()
 
 
 def fuse_ranked_memory_rows(vec_rows: list[dict], fts_rows: list[dict]) -> list[dict]:

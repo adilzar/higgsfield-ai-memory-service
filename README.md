@@ -121,6 +121,7 @@ Context is assembled in priority order, stopping when `max_tokens` is reached:
 
 **Session deletion and supersession integrity:**
 - When a session is deleted, any memories that were superseded by memories in that session are reactivated
+- If the deleted session is in the middle of a supersession chain, remaining memories are stitched together so newer active memories keep pointing to the nearest surviving ancestor
 - This prevents "orphaned" inactive memories with dangling pointers
 
 **Opinion arcs** (e.g., TypeScript opinions evolving):

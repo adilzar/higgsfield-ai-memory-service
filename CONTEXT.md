@@ -12,6 +12,10 @@ _Avoid_: Message batch, chat chunk
 Structured knowledge extracted from a Turn, with type, key, value, confidence, provenance, and active/supersession state.
 _Avoid_: Raw chunk, note, embedding record
 
+**Memory Lifecycle**:
+Rules that preserve Memory active state and supersession links when Turns, Sessions, or Users are deleted.
+_Avoid_: Cleanup, cascade logic
+
 **Recall**:
 The process that selects stored Memory and recent Turn evidence, then formats Context for the next agent turn.
 _Avoid_: Retrieval, search, lookup

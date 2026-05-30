@@ -12,9 +12,10 @@ from src.config import settings
 from src.database import get_db, init_db
 from src.embeddings import embed_text
 from src.intake import IngestTurnCommand, TurnMessage, ingest_turn
+from src.lifecycle import delete_session_data, delete_user_data
 from src.recall import build_recall_context
 from src.search import SearchMemoriesCommand, search_memories
-from src.store import delete_session_data, delete_user_data, fetch_user_memory_models
+from src.store import fetch_user_memory_models
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
