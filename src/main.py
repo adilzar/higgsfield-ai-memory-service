@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.api_models import UserMemoriesResponse, format_user_memories
 from src.config import settings
 from src.database import get_db, init_db
 from src.embeddings import embed_text
@@ -43,7 +44,7 @@ async def auth_middleware(request: Request, call_next):
     return await call_next(request)
 
 
-# --- Request/Response Models ---
+# --- Request Models ---
 class Message(BaseModel):
     role: str
     content: str
@@ -115,28 +116,10 @@ async def search(req: SearchRequest, db: AsyncSession = Depends(get_db)):
     return {"results": results}
 
 
-@app.get("/users/{user_id}/memories")
+@app.get("/users/{user_id}/memories", response_model=UserMemoriesResponse)
 async def get_user_memories(user_id: str, db: AsyncSession = Depends(get_db)):
     memories = await fetch_user_memory_models(db, user_id)
-    return {
-        "memories": [
-            {
-                "id": m.id,
-                "type": m.type,
-                "key": m.key,
-                "value": m.value,
-                "confidence": m.confidence,
-                "source_session": m.session_id,
-                "source_turn": m.source_turn_id,
-                "created_at": m.created_at.isoformat() if m.created_at else None,
-                "updated_at": m.updated_at.isoformat() if m.updated_at else None,
-                "supersedes": m.supersedes,
-                "superseded_by": m.superseded_by,
-                "active": m.active,
-            }
-            for m in memories
-        ]
-    }
+    return format_user_memories(memories)
 
 
 @app.delete("/sessions/{session_id}", status_code=204)
