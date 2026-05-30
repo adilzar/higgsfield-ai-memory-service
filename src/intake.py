@@ -7,9 +7,10 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.embeddings import embed_text, embed_texts
-from src.extraction import ExtractedMemory, ExtractionError, extract_memories
-from src.models import Memory, Turn
+from src.embeddings import embed_text
+from src.extraction import ExtractionError, extract_memories
+from src.memory_write import MemoryWriteContext, memory_refs, persist_extracted_memories
+from src.models import Turn
 from src.store import fetch_active_memory_models
 
 logger = logging.getLogger(__name__)
@@ -58,7 +59,16 @@ async def ingest_turn(db: AsyncSession, cmd: IngestTurnCommand) -> str:
         await db.commit()
         return turn_id
 
-    await persist_extracted_memories(db, cmd, turn_id, existing, result.memories)
+    await persist_extracted_memories(
+        db,
+        MemoryWriteContext(
+            session_id=cmd.session_id,
+            user_id=cmd.user_id,
+            source_turn_id=turn_id,
+        ),
+        existing,
+        result.memories,
+    )
 
     await db.commit()
     return turn_id
@@ -76,47 +86,3 @@ def parse_turn_timestamp(timestamp: str | None) -> datetime:
 
 def message_to_dict(message: TurnMessage) -> dict:
     return {"role": message.role, "content": message.content, "name": message.name}
-
-
-def memory_refs(memories: list[Memory]) -> list[dict]:
-    return [{"id": m.id, "key": m.key, "type": m.type, "value": m.value} for m in memories]
-
-
-async def persist_extracted_memories(
-    db: AsyncSession,
-    cmd: IngestTurnCommand,
-    turn_id: str,
-    existing: list[Memory],
-    extracted: list[ExtractedMemory],
-) -> None:
-    if not extracted:
-        return
-
-    embeddings = embed_texts([m.value for m in extracted])
-    existing_by_key = {m.key: m for m in reversed(existing)}
-
-    for index, mem_data in enumerate(extracted):
-        mem_id = str(uuid.uuid4())
-        superseded = existing_by_key.get(mem_data.supersedes_key)
-        supersedes_id = None
-
-        if superseded:
-            supersedes_id = superseded.id
-            superseded.active = False
-            superseded.superseded_by = mem_id
-            superseded.updated_at = datetime.utcnow()
-
-        memory = Memory(
-            id=mem_id,
-            user_id=cmd.user_id,
-            session_id=cmd.session_id,
-            source_turn_id=turn_id,
-            type=mem_data.type,
-            key=mem_data.key,
-            value=mem_data.value,
-            confidence=mem_data.confidence,
-            active=True,
-            supersedes=supersedes_id,
-            embedding=embeddings[index],
-        )
-        db.add(memory)
