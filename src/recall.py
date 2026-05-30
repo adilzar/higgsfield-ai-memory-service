@@ -44,11 +44,49 @@ STOPWORDS = {
 
 INTENT_TERMS = {
     "location": {"where", "live", "lives", "city", "moved", "home", "reside", "living"},
-    "employment": {"work", "works", "job", "career", "employer", "company", "role", "pm", "engineer", "designer", "do", "occupation"},
+    "employment": {
+        "work",
+        "works",
+        "job",
+        "career",
+        "employer",
+        "company",
+        "role",
+        "pm",
+        "engineer",
+        "designer",
+        "do",
+        "occupation",
+    },
     "pet": {"dog", "cat", "pet", "pets", "biscuit"},
-    "diet": {"diet", "dietary", "vegetarian", "shellfish", "allergy", "allergic", "food", "eat"},
-    "communication_style": {"concise", "direct", "answers", "style", "prefer", "preference", "fluff"},
-    "opinion": {"think", "opinion", "programming", "language", "typescript", "python", "love"},
+    "diet": {
+        "diet",
+        "dietary",
+        "vegetarian",
+        "shellfish",
+        "allergy",
+        "allergic",
+        "food",
+        "eat",
+    },
+    "communication_style": {
+        "concise",
+        "direct",
+        "answers",
+        "style",
+        "prefer",
+        "preference",
+        "fluff",
+    },
+    "opinion": {
+        "think",
+        "opinion",
+        "programming",
+        "language",
+        "typescript",
+        "python",
+        "love",
+    },
 }
 
 STABLE_INTENTS = {"location", "employment", "pet", "diet", "communication_style"}
@@ -82,7 +120,10 @@ async def build_recall_context(
     recent = await fetch_recent_turns(db, session_id)
     return assemble_context(memories, recent, max_tokens)
 
-def _select_recall_memories(query: str, retrieved: list[dict], scope_memories: list[dict]) -> list[dict]:
+
+def _select_recall_memories(
+    query: str, retrieved: list[dict], scope_memories: list[dict]
+) -> list[dict]:
     query_tokens = _tokens(query)
     query_intents = _query_intents(query)
     profile_query = _is_profile_query(query, query_intents)
@@ -103,8 +144,7 @@ def _select_recall_memories(query: str, retrieved: list[dict], scope_memories: l
         return selected
 
     relevant = [
-        memory for memory in retrieved
-        if _memory_matches_query(memory, query_tokens, query_intents)
+        memory for memory in retrieved if _memory_matches_query(memory, query_tokens, query_intents)
     ]
 
     for memory in relevant:
@@ -147,11 +187,15 @@ def _memory_matches_query(memory: dict, query_tokens: set[str], query_intents: s
     if memory.get("fts_score", 0) and float(memory["fts_score"]) > 0:
         return True
 
-    memory_tokens = _tokens(" ".join([
-        str(memory.get("key", "")),
-        str(memory.get("type", "")),
-        str(memory.get("value", "")),
-    ]))
+    memory_tokens = _tokens(
+        " ".join(
+            [
+                str(memory.get("key", "")),
+                str(memory.get("type", "")),
+                str(memory.get("value", "")),
+            ]
+        )
+    )
     if query_tokens & memory_tokens:
         return True
 
@@ -160,11 +204,7 @@ def _memory_matches_query(memory: dict, query_tokens: set[str], query_intents: s
 
 def _query_intents(query: str) -> set[str]:
     tokens = _tokens(query)
-    intents = {
-        intent
-        for intent, terms in INTENT_TERMS.items()
-        if tokens & terms
-    }
+    intents = {intent for intent, terms in INTENT_TERMS.items() if tokens & terms}
     if "preference" in intents:
         intents.add("communication_style")
     return intents
@@ -177,7 +217,18 @@ def _memory_intents(memory: dict) -> set[str]:
 
     if any(part in key for part in ("location", "city", "home", "moved")):
         intents.add("location")
-    if any(part in key for part in ("employment", "career", "job", "work", "company", "occupation", "role")):
+    if any(
+        part in key
+        for part in (
+            "employment",
+            "career",
+            "job",
+            "work",
+            "company",
+            "occupation",
+            "role",
+        )
+    ):
         intents.add("employment")
     if any(part in key for part in ("pet", "dog", "cat")):
         intents.add("pet")

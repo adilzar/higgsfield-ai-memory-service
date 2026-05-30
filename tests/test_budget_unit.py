@@ -37,9 +37,7 @@ def test_tight_budget_keeps_fact_before_recent_turn():
 
     assert "Lives in Berlin" in context
     assert "Recent conversation context" not in context
-    assert citations == [
-        {"turn_id": "turn-1", "score": 0.1, "snippet": "Lives in Berlin"}
-    ]
+    assert citations == [{"turn_id": "turn-1", "score": 0.1, "snippet": "Lives in Berlin"}]
 
 
 def test_budget_policy_caps_preferences_before_relevant_memories():

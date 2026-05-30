@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-
 FACT_SHARE = 0.50
 PREFERENCE_SHARE = 0.25
 MAX_FACTS = 15

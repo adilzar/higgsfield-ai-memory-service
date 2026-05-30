@@ -8,7 +8,6 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-
 BASE_URL = os.getenv("MEMORY_BASE_URL", "http://localhost:8080")
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -88,12 +87,16 @@ class RestartPersistenceTest(unittest.TestCase):
         )
         wait_for_health()
 
-        status, body = request("POST", "/recall", {
-            "query": "Where does this user live?",
-            "session_id": recall_session_id,
-            "user_id": user_id,
-            "max_tokens": 512,
-        })
+        status, body = request(
+            "POST",
+            "/recall",
+            {
+                "query": "Where does this user live?",
+                "session_id": recall_session_id,
+                "user_id": user_id,
+                "max_tokens": 512,
+            },
+        )
 
         self.assertEqual(status, 200, body)
         self.assertIsInstance(body, dict)
@@ -104,19 +107,23 @@ class RestartPersistenceTest(unittest.TestCase):
         )
 
     def ingest_fact(self, user_id: str, session_id: str, fact_token: str) -> None:
-        status, body = request("POST", "/turns", {
-            "session_id": session_id,
-            "user_id": user_id,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": f"I live in {fact_token}. Please remember that exact city name.",
-                },
-                {"role": "assistant", "content": "Got it."},
-            ],
-            "timestamp": "2026-05-30T10:00:00Z",
-            "metadata": {"test": "restart-persistence"},
-        })
+        status, body = request(
+            "POST",
+            "/turns",
+            {
+                "session_id": session_id,
+                "user_id": user_id,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": f"I live in {fact_token}. Please remember that exact city name.",
+                    },
+                    {"role": "assistant", "content": "Got it."},
+                ],
+                "timestamp": "2026-05-30T10:00:00Z",
+                "metadata": {"test": "restart-persistence"},
+            },
+        )
 
         self.assertEqual(status, 201, body)
         self.assertIsInstance(body, dict)

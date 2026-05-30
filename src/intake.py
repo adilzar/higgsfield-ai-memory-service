@@ -79,10 +79,7 @@ def message_to_dict(message: TurnMessage) -> dict:
 
 
 def memory_refs(memories: list[Memory]) -> list[dict]:
-    return [
-        {"id": m.id, "key": m.key, "type": m.type, "value": m.value}
-        for m in memories
-    ]
+    return [{"id": m.id, "key": m.key, "type": m.type, "value": m.value} for m in memories]
 
 
 async def persist_extracted_memories(

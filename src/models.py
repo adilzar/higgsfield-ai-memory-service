@@ -1,12 +1,10 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import (
-    Boolean, Column, DateTime, Float, ForeignKey, Index, String, Text, text
-)
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Index, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, relationship
-from pgvector.sqlalchemy import Vector
 
 
 class Base(DeclarativeBase):
@@ -29,7 +27,11 @@ class Turn(Base):
     memories = relationship("Memory", back_populates="source_turn_rel")
 
     __table_args__ = (
-        Index("ix_turns_fts", text("to_tsvector('english', content_text)"), postgresql_using="gin"),
+        Index(
+            "ix_turns_fts",
+            text("to_tsvector('english', content_text)"),
+            postgresql_using="gin",
+        ),
     )
 
 
@@ -54,6 +56,10 @@ class Memory(Base):
     source_turn_rel = relationship("Turn", back_populates="memories")
 
     __table_args__ = (
-        Index("ix_memories_fts", text("to_tsvector('english', value)"), postgresql_using="gin"),
+        Index(
+            "ix_memories_fts",
+            text("to_tsvector('english', value)"),
+            postgresql_using="gin",
+        ),
         Index("ix_memories_user_active", "user_id", "active"),
     )

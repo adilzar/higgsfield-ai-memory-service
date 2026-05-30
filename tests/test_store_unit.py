@@ -1,8 +1,4 @@
-from src.store import (
-    _filtered_memory_scope,
-    _recall_memory_scope,
-    fuse_ranked_memory_rows,
-)
+from src.store import _filtered_memory_scope, _recall_memory_scope, fuse_ranked_memory_rows
 
 
 def test_fuse_ranked_memory_rows_merges_vector_and_fts_scores():

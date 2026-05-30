@@ -46,6 +46,7 @@ Respond with ONLY a JSON array, no other text."""
 
 class ExtractionError(Exception):
     """Raised when LLM extraction fails in a non-recoverable way."""
+
     pass
 
 
@@ -56,9 +57,13 @@ class ExtractionResult:
 
 
 def _build_prompt(turn_content: str, existing_memories: list[dict]) -> str:
-    existing_str = "None" if not existing_memories else json.dumps(
-        [{"key": m["key"], "type": m["type"], "value": m["value"]} for m in existing_memories],
-        indent=2
+    existing_str = (
+        "None"
+        if not existing_memories
+        else json.dumps(
+            [{"key": m["key"], "type": m["type"], "value": m["value"]} for m in existing_memories],
+            indent=2,
+        )
     )
     return EXTRACTION_PROMPT.format(existing_memories=existing_str, turn_content=turn_content)
 

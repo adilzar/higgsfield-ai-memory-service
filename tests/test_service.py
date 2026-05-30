@@ -3,6 +3,7 @@ Integration tests for the Memory Service.
 Run with: pytest tests/ -v
 Requires the service running at http://localhost:8080
 """
+
 import json
 import time
 
@@ -35,27 +36,36 @@ class TestHealth:
 class TestContract:
     def test_turn_roundtrip(self, client):
         """Write a turn, recall it, verify shape."""
-        r = client.post("/turns", json={
-            "session_id": "test-contract-session",
-            "user_id": "test-contract-user",
-            "messages": [
-                {"role": "user", "content": "I work at Google as a designer."},
-                {"role": "assistant", "content": "Nice! How long have you been there?"}
-            ],
-            "timestamp": "2025-05-01T10:00:00Z",
-            "metadata": {}
-        })
+        r = client.post(
+            "/turns",
+            json={
+                "session_id": "test-contract-session",
+                "user_id": "test-contract-user",
+                "messages": [
+                    {"role": "user", "content": "I work at Google as a designer."},
+                    {
+                        "role": "assistant",
+                        "content": "Nice! How long have you been there?",
+                    },
+                ],
+                "timestamp": "2025-05-01T10:00:00Z",
+                "metadata": {},
+            },
+        )
         assert r.status_code == 201
         body = r.json()
         assert "id" in body
 
         # Recall should find it
-        r = client.post("/recall", json={
-            "query": "Where does the user work?",
-            "session_id": "test-contract-session",
-            "user_id": "test-contract-user",
-            "max_tokens": 512
-        })
+        r = client.post(
+            "/recall",
+            json={
+                "query": "Where does the user work?",
+                "session_id": "test-contract-session",
+                "user_id": "test-contract-user",
+                "max_tokens": 512,
+            },
+        )
         assert r.status_code == 200
         body = r.json()
         assert "context" in body
@@ -64,12 +74,15 @@ class TestContract:
 
     def test_recall_empty_session(self, client):
         """Cold session returns empty context, not error."""
-        r = client.post("/recall", json={
-            "query": "anything",
-            "session_id": "nonexistent-session",
-            "user_id": "nonexistent-user",
-            "max_tokens": 512
-        })
+        r = client.post(
+            "/recall",
+            json={
+                "query": "anything",
+                "session_id": "nonexistent-session",
+                "user_id": "nonexistent-user",
+                "max_tokens": 512,
+            },
+        )
         assert r.status_code == 200
         body = r.json()
         assert body["context"] == ""
@@ -77,22 +90,28 @@ class TestContract:
 
     def test_search_endpoint(self, client):
         """Search returns structured results."""
-        client.post("/turns", json={
-            "session_id": "test-contract-session",
-            "user_id": "test-contract-user",
-            "messages": [
-                {"role": "user", "content": "My favorite color is blue."},
-                {"role": "assistant", "content": "Blue is a great color!"}
-            ],
-            "timestamp": "2025-05-01T11:00:00Z",
-            "metadata": {}
-        })
+        client.post(
+            "/turns",
+            json={
+                "session_id": "test-contract-session",
+                "user_id": "test-contract-user",
+                "messages": [
+                    {"role": "user", "content": "My favorite color is blue."},
+                    {"role": "assistant", "content": "Blue is a great color!"},
+                ],
+                "timestamp": "2025-05-01T11:00:00Z",
+                "metadata": {},
+            },
+        )
 
-        r = client.post("/search", json={
-            "query": "favorite color",
-            "user_id": "test-contract-user",
-            "limit": 5
-        })
+        r = client.post(
+            "/search",
+            json={
+                "query": "favorite color",
+                "user_id": "test-contract-user",
+                "limit": 5,
+            },
+        )
         assert r.status_code == 200
         body = r.json()
         assert "results" in body
@@ -102,16 +121,19 @@ class TestContract:
 
     def test_user_memories_endpoint(self, client):
         """User memories returns structured data."""
-        client.post("/turns", json={
-            "session_id": "test-contract-session",
-            "user_id": "test-contract-user",
-            "messages": [
-                {"role": "user", "content": "I have a cat named Whiskers."},
-                {"role": "assistant", "content": "Cute name!"}
-            ],
-            "timestamp": "2025-05-01T12:00:00Z",
-            "metadata": {}
-        })
+        client.post(
+            "/turns",
+            json={
+                "session_id": "test-contract-session",
+                "user_id": "test-contract-user",
+                "messages": [
+                    {"role": "user", "content": "I have a cat named Whiskers."},
+                    {"role": "assistant", "content": "Cute name!"},
+                ],
+                "timestamp": "2025-05-01T12:00:00Z",
+                "metadata": {},
+            },
+        )
 
         r = client.get("/users/test-contract-user/memories")
         assert r.status_code == 200
@@ -147,44 +169,59 @@ class TestMalformedInput:
         assert r.status_code == 422
 
     def test_invalid_recall_budget(self, client):
-        r = client.post("/recall", json={
-            "query": "anything",
-            "session_id": "test-contract-session",
-            "user_id": "test-contract-user",
-            "max_tokens": 0,
-        })
+        r = client.post(
+            "/recall",
+            json={
+                "query": "anything",
+                "session_id": "test-contract-session",
+                "user_id": "test-contract-user",
+                "max_tokens": 0,
+            },
+        )
         assert r.status_code == 422
 
     def test_invalid_search_limit(self, client):
-        r = client.post("/search", json={
-            "query": "anything",
-            "user_id": "test-contract-user",
-            "limit": 0,
-        })
+        r = client.post(
+            "/search",
+            json={
+                "query": "anything",
+                "user_id": "test-contract-user",
+                "limit": 0,
+            },
+        )
         assert r.status_code == 422
 
     def test_unicode_content(self, client):
         """Unicode doesn't crash the service."""
-        r = client.post("/turns", json={
-            "session_id": "test-contract-session",
-            "user_id": "test-contract-user",
-            "messages": [
-                {"role": "user", "content": "I like 日本語 and émojis 🎉🚀 and Ñoño"},
-                {"role": "assistant", "content": "Cool! 你好世界"}
-            ],
-            "timestamp": "2025-05-01T10:00:00Z",
-            "metadata": {}
-        })
+        r = client.post(
+            "/turns",
+            json={
+                "session_id": "test-contract-session",
+                "user_id": "test-contract-user",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "I like 日本語 and émojis 🎉🚀 and Ñoño",
+                    },
+                    {"role": "assistant", "content": "Cool! 你好世界"},
+                ],
+                "timestamp": "2025-05-01T10:00:00Z",
+                "metadata": {},
+            },
+        )
         assert r.status_code == 201
 
     def test_empty_messages(self, client):
-        r = client.post("/turns", json={
-            "session_id": "test-contract-session",
-            "user_id": "test-contract-user",
-            "messages": [],
-            "timestamp": "2025-05-01T10:00:00Z",
-            "metadata": {}
-        })
+        r = client.post(
+            "/turns",
+            json={
+                "session_id": "test-contract-session",
+                "user_id": "test-contract-user",
+                "messages": [],
+                "timestamp": "2025-05-01T10:00:00Z",
+                "metadata": {},
+            },
+        )
         # Should handle gracefully (either 201 with no extraction or 422)
         assert r.status_code in (201, 422)
 
@@ -192,34 +229,43 @@ class TestMalformedInput:
 class TestConcurrentSessions:
     def test_no_bleed_between_users(self, client):
         """Two users' memories don't bleed."""
-        client.post("/turns", json={
-            "session_id": "session-user-a",
-            "user_id": "user-a",
-            "messages": [
-                {"role": "user", "content": "I'm a doctor in London."},
-                {"role": "assistant", "content": "Interesting!"}
-            ],
-            "timestamp": "2025-05-01T10:00:00Z",
-            "metadata": {}
-        })
-        client.post("/turns", json={
-            "session_id": "session-user-b",
-            "user_id": "user-b",
-            "messages": [
-                {"role": "user", "content": "I'm a chef in Tokyo."},
-                {"role": "assistant", "content": "Cool!"}
-            ],
-            "timestamp": "2025-05-01T10:00:00Z",
-            "metadata": {}
-        })
+        client.post(
+            "/turns",
+            json={
+                "session_id": "session-user-a",
+                "user_id": "user-a",
+                "messages": [
+                    {"role": "user", "content": "I'm a doctor in London."},
+                    {"role": "assistant", "content": "Interesting!"},
+                ],
+                "timestamp": "2025-05-01T10:00:00Z",
+                "metadata": {},
+            },
+        )
+        client.post(
+            "/turns",
+            json={
+                "session_id": "session-user-b",
+                "user_id": "user-b",
+                "messages": [
+                    {"role": "user", "content": "I'm a chef in Tokyo."},
+                    {"role": "assistant", "content": "Cool!"},
+                ],
+                "timestamp": "2025-05-01T10:00:00Z",
+                "metadata": {},
+            },
+        )
 
         # User A recall should not mention Tokyo/chef
-        r = client.post("/recall", json={
-            "query": "What does this user do?",
-            "session_id": "session-user-a",
-            "user_id": "user-a",
-            "max_tokens": 512
-        })
+        r = client.post(
+            "/recall",
+            json={
+                "query": "What does this user do?",
+                "session_id": "session-user-a",
+                "user_id": "user-a",
+                "max_tokens": 512,
+            },
+        )
         context = r.json()["context"]
         assert "Tokyo" not in context
         assert "chef" not in context
@@ -247,12 +293,15 @@ class TestRecallQuality:
         total = len(fixture["probes"])
 
         for probe in fixture["probes"]:
-            r = client.post("/recall", json={
-                "query": probe["query"],
-                "session_id": probe["session_id"],
-                "user_id": probe["user_id"],
-                "max_tokens": 1024
-            })
+            r = client.post(
+                "/recall",
+                json={
+                    "query": probe["query"],
+                    "session_id": probe["session_id"],
+                    "user_id": probe["user_id"],
+                    "max_tokens": 1024,
+                },
+            )
             assert r.status_code == 200
             context = r.json()["context"].lower()
 

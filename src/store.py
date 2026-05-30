@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from sqlalchemy import delete, select, text as sa_text
+from sqlalchemy import delete, select
+from sqlalchemy import text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import Memory, Turn
@@ -17,9 +18,7 @@ async def fetch_active_memory_models(
         predicate = Memory.session_id == session_id
 
     result = await db.execute(
-        select(Memory)
-        .where(predicate, Memory.active == True)
-        .order_by(Memory.created_at.desc())
+        select(Memory).where(predicate, Memory.active == True).order_by(Memory.created_at.desc())
     )
     return list(result.scalars().all())
 
@@ -42,7 +41,8 @@ async def vector_search_memories(
         params["session_id"] = session_id
 
     where = " AND ".join(conditions)
-    sql = sa_text(f"""
+    sql = sa_text(
+        f"""
         SELECT id, type, key, value, confidence, session_id, source_turn_id,
                created_at, updated_at, active, supersedes, superseded_by,
                1 - (embedding <=> CAST(:embedding AS vector)) as score
@@ -50,7 +50,8 @@ async def vector_search_memories(
         WHERE {where}
         ORDER BY embedding <=> CAST(:embedding AS vector)
         LIMIT :limit
-    """)
+    """
+    )
     result = await db.execute(sql, params)
     return [dict(r) for r in result.mappings().all()]
 
@@ -64,9 +65,7 @@ async def hybrid_search_memories(
     limit: int,
 ) -> list[dict]:
     where, scope_params = _recall_memory_scope(user_id, session_id)
-    return await _hybrid_search_memory_rows(
-        db, query, query_embedding, where, scope_params, limit
-    )
+    return await _hybrid_search_memory_rows(db, query, query_embedding, where, scope_params, limit)
 
 
 async def hybrid_search_filtered_memories(
@@ -78,9 +77,7 @@ async def hybrid_search_filtered_memories(
     limit: int,
 ) -> list[dict]:
     where, scope_params = _filtered_memory_scope(user_id, session_id)
-    return await _hybrid_search_memory_rows(
-        db, query, query_embedding, where, scope_params, limit
-    )
+    return await _hybrid_search_memory_rows(db, query, query_embedding, where, scope_params, limit)
 
 
 async def _hybrid_search_memory_rows(
@@ -98,7 +95,8 @@ async def _hybrid_search_memory_rows(
         "limit": limit,
     }
 
-    vector_sql = sa_text(f"""
+    vector_sql = sa_text(
+        f"""
         SELECT id, type, key, value, confidence, session_id, source_turn_id, created_at, updated_at,
                active, supersedes, superseded_by,
                1 - (embedding <=> CAST(:embedding AS vector)) as vec_score
@@ -106,11 +104,13 @@ async def _hybrid_search_memory_rows(
         WHERE {where}
         ORDER BY embedding <=> CAST(:embedding AS vector)
         LIMIT :limit
-    """)
+    """
+    )
     vec_result = await db.execute(vector_sql, params)
     vec_rows = [dict(row) for row in vec_result.mappings().all()]
 
-    fts_sql = sa_text(f"""
+    fts_sql = sa_text(
+        f"""
         SELECT id, type, key, value, confidence, session_id, source_turn_id, created_at, updated_at,
                active, supersedes, superseded_by,
                ts_rank(to_tsvector('english', value), plainto_tsquery('english', :query)) as fts_score
@@ -119,7 +119,8 @@ async def _hybrid_search_memory_rows(
           AND to_tsvector('english', value) @@ plainto_tsquery('english', :query)
         ORDER BY fts_score DESC
         LIMIT :limit
-    """)
+    """
+    )
     fts_result = await db.execute(fts_sql, params)
     fts_rows = [dict(row) for row in fts_result.mappings().all()]
 
@@ -132,9 +133,7 @@ def _recall_memory_scope(user_id: str | None, session_id: str) -> tuple[str, dic
     return "active = true AND session_id = :session_id", {"session_id": session_id}
 
 
-def _filtered_memory_scope(
-    user_id: str | None, session_id: str | None
-) -> tuple[str, dict]:
+def _filtered_memory_scope(user_id: str | None, session_id: str | None) -> tuple[str, dict]:
     conditions = ["active = true"]
     params = {}
 
@@ -155,28 +154,30 @@ async def fetch_scope_memories(
     include_inactive: bool = False,
 ) -> list[dict]:
     active_clause = "" if include_inactive else "AND active = true"
-    sql = sa_text(f"""
+    sql = sa_text(
+        f"""
         SELECT id, type, key, value, confidence, session_id, source_turn_id, created_at, updated_at,
                active, supersedes, superseded_by
         FROM memories
         WHERE (user_id = :user_id OR (:user_id IS NULL AND session_id = :session_id))
           {active_clause}
         ORDER BY active DESC, created_at DESC
-    """)
+    """
+    )
     result = await db.execute(sql, {"user_id": user_id, "session_id": session_id})
     return [dict(r) for r in result.mappings().all()]
 
 
-async def fetch_recent_turns(
-    db: AsyncSession, session_id: str, limit: int = 5
-) -> list[dict]:
-    sql = sa_text("""
+async def fetch_recent_turns(db: AsyncSession, session_id: str, limit: int = 5) -> list[dict]:
+    sql = sa_text(
+        """
         SELECT id, content_text, timestamp
         FROM turns
         WHERE session_id = :session_id
         ORDER BY timestamp DESC
         LIMIT :limit
-    """)
+    """
+    )
     result = await db.execute(sql, {"session_id": session_id, "limit": limit})
     return [dict(r) for r in result.mappings().all()]
 
@@ -191,13 +192,15 @@ async def fetch_user_memory_models(db: AsyncSession, user_id: str) -> list[Memor
 async def delete_session_data(db: AsyncSession, session_id: str) -> None:
     # Reactivate memories that were superseded by memories in this session
     await db.execute(
-        sa_text("""
+        sa_text(
+            """
             UPDATE memories SET active = true, superseded_by = NULL
             WHERE id IN (
                 SELECT supersedes FROM memories
                 WHERE session_id = :session_id AND supersedes IS NOT NULL
             )
-        """),
+        """
+        ),
         {"session_id": session_id},
     )
     await db.execute(delete(Memory).where(Memory.session_id == session_id))
