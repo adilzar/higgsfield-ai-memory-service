@@ -1,7 +1,7 @@
 from datetime import datetime
 from types import SimpleNamespace
 
-from src.api_models import (
+from src.api.schemas import (
     RecallRequest,
     SearchRequest,
     TurnRequest,

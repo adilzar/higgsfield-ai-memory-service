@@ -5,9 +5,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from src.auth import enforce_memory_auth
-from src.bootstrap import initialize_service
-from src.routes import router
+from src.api.auth import enforce_memory_auth
+from src.api.bootstrap import initialize_service
+from src.api.routes import router
 
 logging.basicConfig(level=logging.INFO)
 

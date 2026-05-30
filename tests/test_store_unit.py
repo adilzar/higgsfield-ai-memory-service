@@ -1,5 +1,5 @@
-from src.ranking import fuse_ranked_memory_rows
-from src.retrieval import filtered_memory_scope, recall_memory_scope
+from src.recall.ranking import fuse_ranked_memory_rows
+from src.recall.retrieval import filtered_memory_scope, recall_memory_scope
 
 
 def test_fuse_ranked_memory_rows_merges_vector_and_fts_scores():

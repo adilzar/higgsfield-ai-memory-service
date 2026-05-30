@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.auth import AuthPolicy, enforce_memory_auth
+from src.api.auth import AuthPolicy, enforce_memory_auth
 
 
 def test_auth_policy_allows_all_paths_when_token_disabled():
@@ -27,7 +27,7 @@ def test_auth_policy_requires_matching_bearer_token():
 
 @pytest.mark.asyncio
 async def test_auth_middleware_rejects_unauthorized_request(monkeypatch):
-    monkeypatch.setattr("src.auth.settings.memory_auth_token", "secret")
+    monkeypatch.setattr("src.api.auth.settings.memory_auth_token", "secret")
     request = SimpleNamespace(url=SimpleNamespace(path="/recall"), headers={})
     called = False
 
@@ -44,7 +44,7 @@ async def test_auth_middleware_rejects_unauthorized_request(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_auth_middleware_forwards_authorized_request(monkeypatch):
-    monkeypatch.setattr("src.auth.settings.memory_auth_token", "secret")
+    monkeypatch.setattr("src.api.auth.settings.memory_auth_token", "secret")
     request = SimpleNamespace(
         url=SimpleNamespace(path="/recall"),
         headers={"authorization": "Bearer secret"},

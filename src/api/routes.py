@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api_models import (
+from src.api.schemas import (
     RecallRequest,
     SearchRequest,
     TurnRequest,

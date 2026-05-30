@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlalchemy import text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.ranking import fuse_ranked_memory_rows
+from src.recall.ranking import fuse_ranked_memory_rows
 
 
 def recall_memory_scope(user_id: str | None, session_id: str) -> tuple[str, dict]:

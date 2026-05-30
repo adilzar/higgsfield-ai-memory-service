@@ -1,6 +1,6 @@
 import pytest
 
-from src.bootstrap import initialize_service
+from src.api.bootstrap import initialize_service
 
 
 @pytest.mark.asyncio

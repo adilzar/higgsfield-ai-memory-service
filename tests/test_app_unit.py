@@ -1,5 +1,5 @@
-from src.app import create_app
-from src.auth import enforce_memory_auth
+from src.api.app import create_app
+from src.api.auth import enforce_memory_auth
 
 
 def test_create_app_registers_expected_routes():

@@ -6,9 +6,9 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.budget import assemble_context
 from src.embeddings import embed_text
-from src.retrieval import hybrid_search_memories
+from src.recall.budget import assemble_context
+from src.recall.retrieval import hybrid_search_memories
 from src.store import fetch_recent_turns, fetch_scope_memories
 
 logger = logging.getLogger(__name__)
