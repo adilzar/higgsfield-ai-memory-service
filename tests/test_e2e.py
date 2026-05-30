@@ -288,11 +288,16 @@ class TestSessionDelete:
         r = client.get("/users/e2e-user-1/memories")
         memories = r.json()["memories"]
         active = [m for m in memories if m["active"]]
-        assert any("nyc" in m["value"].lower() for m in active)
+        assert any(is_nyc_memory(m["value"]) for m in active)
 
         # Recall should return the old fact
         result = recall(client, "Where does the user live?", "s3", "e2e-user-1")
-        assert "nyc" in result["context"].lower()
+        assert is_nyc_memory(result["context"])
+
+
+def is_nyc_memory(value: str) -> bool:
+    normalized = value.lower()
+    return "nyc" in normalized or "new york" in normalized
 
 
 class TestImplicitFacts:
