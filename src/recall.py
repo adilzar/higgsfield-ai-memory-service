@@ -8,7 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.budget import assemble_context
 from src.embeddings import embed_text
-from src.store import fetch_recent_turns, fetch_scope_memories, hybrid_search_memories
+from src.retrieval import hybrid_search_memories
+from src.store import fetch_recent_turns, fetch_scope_memories
 
 logger = logging.getLogger(__name__)
 
@@ -117,9 +118,7 @@ async def build_recall_context(
     """Build prompt Context and Citations for /recall."""
     include_inactive = _needs_history(cmd.query)
     retrieved = await hybrid_retrieve(db, cmd.query, cmd.user_id, cmd.session_id)
-    scope_memories = await fetch_scope_memories(
-        db, cmd.user_id, cmd.session_id, include_inactive
-    )
+    scope_memories = await fetch_scope_memories(db, cmd.user_id, cmd.session_id, include_inactive)
     memories = _select_recall_memories(cmd.query, retrieved, scope_memories)
 
     if not memories:

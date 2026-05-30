@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.embeddings import embed_text
-from src.store import hybrid_search_filtered_memories
+from src.retrieval import hybrid_search_filtered_memories
 
 
 @dataclass(frozen=True)
