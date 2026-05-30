@@ -1,20 +1,18 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import delete, select, text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
-from src.database import async_session, get_db, init_db
-from src.embeddings import embed_text, embed_texts
-from src.extraction import extract_memories
+from src.database import get_db, init_db
+from src.embeddings import embed_text
+from src.intake import IngestTurnCommand, TurnMessage, ingest_turn
 from src.models import Memory, Turn
 from src.recall import build_recall_context
 
@@ -81,77 +79,16 @@ async def health():
 
 @app.post("/turns", status_code=201)
 async def create_turn(req: TurnRequest, db: AsyncSession = Depends(get_db)):
-    turn_id = str(uuid.uuid4())
-    content_text = "\n".join(f"{m.role}: {m.content}" for m in req.messages)
-
-    ts = datetime.fromisoformat(req.timestamp.replace("Z", "+00:00")) if req.timestamp else datetime.utcnow()
-
-    # Embed the turn content
-    turn_embedding = embed_text(content_text)
-
-    # Store the turn
-    turn = Turn(
-        id=turn_id,
-        session_id=req.session_id,
-        user_id=req.user_id,
-        messages=[m.model_dump() for m in req.messages],
-        timestamp=ts,
-        metadata_=req.metadata,
-        content_text=content_text,
-        embedding=turn_embedding,
+    turn_id = await ingest_turn(
+        db,
+        IngestTurnCommand(
+            session_id=req.session_id,
+            user_id=req.user_id,
+            messages=[TurnMessage(m.role, m.content, m.name) for m in req.messages],
+            timestamp=req.timestamp,
+            metadata=req.metadata,
+        ),
     )
-    db.add(turn)
-    await db.flush()
-
-    # Get existing active memories for this user (for contradiction detection)
-    existing = []
-    if req.user_id:
-        result = await db.execute(
-            select(Memory).where(Memory.user_id == req.user_id, Memory.active == True)
-        )
-        existing = [{"id": m.id, "key": m.key, "type": m.type, "value": m.value} for m in result.scalars().all()]
-
-    # Extract memories via LLM
-    extracted = extract_memories(content_text, existing)
-
-    if extracted:
-        values_to_embed = [m["value"] for m in extracted]
-        embeddings = embed_texts(values_to_embed)
-
-        for i, mem_data in enumerate(extracted):
-            mem_id = str(uuid.uuid4())
-
-            # Handle supersession
-            supersedes_id = None
-            supersedes_key = mem_data.get("supersedes_key")
-            if supersedes_key:
-                # Find the existing active memory with this key
-                for ex in existing:
-                    if ex["key"] == supersedes_key:
-                        supersedes_id = ex["id"]
-                        # Mark old memory as inactive
-                        await db.execute(
-                            sa_text("UPDATE memories SET active = false, superseded_by = :new_id, updated_at = NOW() WHERE id = :old_id"),
-                            {"new_id": mem_id, "old_id": ex["id"]}
-                        )
-                        break
-
-            memory = Memory(
-                id=mem_id,
-                user_id=req.user_id,
-                session_id=req.session_id,
-                source_turn_id=turn_id,
-                type=mem_data.get("type", "fact"),
-                key=mem_data.get("key", "unknown"),
-                value=mem_data["value"],
-                confidence=mem_data.get("confidence", 1.0),
-                active=True,
-                supersedes=supersedes_id,
-                embedding=embeddings[i],
-            )
-            db.add(memory)
-
-    await db.commit()
     return {"id": turn_id}
 
 
