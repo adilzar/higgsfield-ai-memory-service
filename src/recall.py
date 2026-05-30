@@ -137,7 +137,13 @@ def _select_recall_memories(query: str, retrieved: list[dict], scope_memories: l
     return selected
 
 
+VEC_SCORE_THRESHOLD = 0.45
+
+
 def _memory_matches_query(memory: dict, query_tokens: set[str], query_intents: set[str]) -> bool:
+    if memory.get("vec_score") and float(memory["vec_score"]) >= VEC_SCORE_THRESHOLD:
+        return True
+
     if memory.get("fts_score", 0) and float(memory["fts_score"]) > 0:
         return True
 
