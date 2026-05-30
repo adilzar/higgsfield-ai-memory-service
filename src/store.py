@@ -63,39 +63,89 @@ async def hybrid_search_memories(
     session_id: str,
     limit: int,
 ) -> list[dict]:
-    vector_sql = sa_text("""
+    where, scope_params = _recall_memory_scope(user_id, session_id)
+    return await _hybrid_search_memory_rows(
+        db, query, query_embedding, where, scope_params, limit
+    )
+
+
+async def hybrid_search_filtered_memories(
+    db: AsyncSession,
+    query: str,
+    query_embedding: list[float],
+    user_id: str | None,
+    session_id: str | None,
+    limit: int,
+) -> list[dict]:
+    where, scope_params = _filtered_memory_scope(user_id, session_id)
+    return await _hybrid_search_memory_rows(
+        db, query, query_embedding, where, scope_params, limit
+    )
+
+
+async def _hybrid_search_memory_rows(
+    db: AsyncSession,
+    query: str,
+    query_embedding: list[float],
+    where: str,
+    scope_params: dict,
+    limit: int,
+) -> list[dict]:
+    params = {
+        **scope_params,
+        "embedding": str(query_embedding),
+        "query": query,
+        "limit": limit,
+    }
+
+    vector_sql = sa_text(f"""
         SELECT id, type, key, value, confidence, session_id, source_turn_id, created_at, updated_at,
                active, supersedes, superseded_by,
                1 - (embedding <=> CAST(:embedding AS vector)) as vec_score
         FROM memories
-        WHERE active = true
-          AND (user_id = :user_id OR (:user_id IS NULL AND session_id = :session_id))
+        WHERE {where}
         ORDER BY embedding <=> CAST(:embedding AS vector)
         LIMIT :limit
     """)
-    vec_result = await db.execute(vector_sql, {
-        "embedding": str(query_embedding), "user_id": user_id,
-        "session_id": session_id, "limit": limit
-    })
+    vec_result = await db.execute(vector_sql, params)
     vec_rows = [dict(row) for row in vec_result.mappings().all()]
 
-    fts_sql = sa_text("""
+    fts_sql = sa_text(f"""
         SELECT id, type, key, value, confidence, session_id, source_turn_id, created_at, updated_at,
                active, supersedes, superseded_by,
                ts_rank(to_tsvector('english', value), plainto_tsquery('english', :query)) as fts_score
         FROM memories
-        WHERE active = true
-          AND (user_id = :user_id OR (:user_id IS NULL AND session_id = :session_id))
+        WHERE {where}
           AND to_tsvector('english', value) @@ plainto_tsquery('english', :query)
         ORDER BY fts_score DESC
         LIMIT :limit
     """)
-    fts_result = await db.execute(fts_sql, {
-        "query": query, "user_id": user_id, "session_id": session_id, "limit": limit
-    })
+    fts_result = await db.execute(fts_sql, params)
     fts_rows = [dict(row) for row in fts_result.mappings().all()]
 
     return fuse_ranked_memory_rows(vec_rows, fts_rows)
+
+
+def _recall_memory_scope(user_id: str | None, session_id: str) -> tuple[str, dict]:
+    if user_id:
+        return "active = true AND user_id = :user_id", {"user_id": user_id}
+    return "active = true AND session_id = :session_id", {"session_id": session_id}
+
+
+def _filtered_memory_scope(
+    user_id: str | None, session_id: str | None
+) -> tuple[str, dict]:
+    conditions = ["active = true"]
+    params = {}
+
+    if user_id:
+        conditions.append("user_id = :user_id")
+        params["user_id"] = user_id
+    if session_id:
+        conditions.append("session_id = :session_id")
+        params["session_id"] = session_id
+
+    return " AND ".join(conditions), params
 
 
 async def fetch_scope_memories(

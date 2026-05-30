@@ -1,4 +1,8 @@
-from src.store import fuse_ranked_memory_rows
+from src.store import (
+    _filtered_memory_scope,
+    _recall_memory_scope,
+    fuse_ranked_memory_rows,
+)
 
 
 def test_fuse_ranked_memory_rows_merges_vector_and_fts_scores():
@@ -28,3 +32,24 @@ def test_fuse_ranked_memory_rows_preserves_single_signal_rows():
     assert by_id["a"]["value"] == "Works at Notion"
     assert by_id["b"]["fts_score"] == 0.9
     assert all("rrf_score" in row for row in fused)
+
+
+def test_recall_memory_scope_uses_user_history_when_user_id_exists():
+    where, params = _recall_memory_scope("user-1", "session-1")
+
+    assert where == "active = true AND user_id = :user_id"
+    assert params == {"user_id": "user-1"}
+
+
+def test_filtered_memory_scope_intersects_user_and_session_filters():
+    where, params = _filtered_memory_scope("user-1", "session-1")
+
+    assert where == "active = true AND user_id = :user_id AND session_id = :session_id"
+    assert params == {"user_id": "user-1", "session_id": "session-1"}
+
+
+def test_filtered_memory_scope_allows_global_search_when_unscoped():
+    where, params = _filtered_memory_scope(None, None)
+
+    assert where == "active = true"
+    assert params == {}

@@ -13,11 +13,11 @@ from src.database import get_db, init_db
 from src.embeddings import embed_text
 from src.intake import IngestTurnCommand, TurnMessage, ingest_turn
 from src.recall import build_recall_context
+from src.search import SearchMemoriesCommand, search_memories
 from src.store import (
     delete_session_data,
     delete_user_data,
     fetch_user_memory_models,
-    vector_search_memories,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -106,23 +106,16 @@ async def recall(req: RecallRequest, db: AsyncSession = Depends(get_db)):
 
 @app.post("/search")
 async def search(req: SearchRequest, db: AsyncSession = Depends(get_db)):
-    query_embedding = embed_text(req.query)
-    rows = await vector_search_memories(
-        db, query_embedding, req.user_id, req.session_id, req.limit
+    results = await search_memories(
+        db,
+        SearchMemoriesCommand(
+            query=req.query,
+            user_id=req.user_id,
+            session_id=req.session_id,
+            limit=req.limit,
+        ),
     )
-
-    return {
-        "results": [
-            {
-                "content": r["value"],
-                "score": round(float(r["score"]), 4),
-                "session_id": r["session_id"],
-                "timestamp": r["created_at"].isoformat() if r["created_at"] else None,
-                "metadata": {"type": r["type"], "key": r["key"]},
-            }
-            for r in rows
-        ]
-    }
+    return {"results": results}
 
 
 @app.get("/users/{user_id}/memories")

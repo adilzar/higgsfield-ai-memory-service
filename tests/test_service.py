@@ -97,6 +97,8 @@ class TestContract:
         body = r.json()
         assert "results" in body
         assert isinstance(body["results"], list)
+        assert body["results"]
+        assert any("blue" in result["content"].lower() for result in body["results"])
 
     def test_user_memories_endpoint(self, client):
         """User memories returns structured data."""
