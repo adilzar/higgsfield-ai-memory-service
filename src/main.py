@@ -6,15 +6,19 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from sqlalchemy import delete, select, text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
 from src.database import get_db, init_db
 from src.embeddings import embed_text
 from src.intake import IngestTurnCommand, TurnMessage, ingest_turn
-from src.models import Memory, Turn
 from src.recall import build_recall_context
+from src.store import (
+    delete_session_data,
+    delete_user_data,
+    fetch_user_memory_models,
+    vector_search_memories,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -103,29 +107,9 @@ async def recall(req: RecallRequest, db: AsyncSession = Depends(get_db)):
 @app.post("/search")
 async def search(req: SearchRequest, db: AsyncSession = Depends(get_db)):
     query_embedding = embed_text(req.query)
-
-    conditions = ["active = true"]
-    params: dict = {"embedding": str(query_embedding), "limit": req.limit, "query": req.query}
-
-    if req.user_id:
-        conditions.append("user_id = :user_id")
-        params["user_id"] = req.user_id
-    if req.session_id:
-        conditions.append("session_id = :session_id")
-        params["session_id"] = req.session_id
-
-    where = " AND ".join(conditions)
-
-    sql = sa_text(f"""
-        SELECT id, value, confidence, session_id, created_at, type, key,
-               1 - (embedding <=> CAST(:embedding AS vector)) as score
-        FROM memories
-        WHERE {where}
-        ORDER BY embedding <=> CAST(:embedding AS vector)
-        LIMIT :limit
-    """)
-    result = await db.execute(sql, params)
-    rows = result.mappings().all()
+    rows = await vector_search_memories(
+        db, query_embedding, req.user_id, req.session_id, req.limit
+    )
 
     return {
         "results": [
@@ -143,10 +127,7 @@ async def search(req: SearchRequest, db: AsyncSession = Depends(get_db)):
 
 @app.get("/users/{user_id}/memories")
 async def get_user_memories(user_id: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(Memory).where(Memory.user_id == user_id).order_by(Memory.created_at.desc())
-    )
-    memories = result.scalars().all()
+    memories = await fetch_user_memory_models(db, user_id)
     return {
         "memories": [
             {
@@ -170,19 +151,11 @@ async def get_user_memories(user_id: str, db: AsyncSession = Depends(get_db)):
 
 @app.delete("/sessions/{session_id}", status_code=204)
 async def delete_session(session_id: str, db: AsyncSession = Depends(get_db)):
-    await db.execute(delete(Memory).where(Memory.session_id == session_id))
-    await db.execute(delete(Turn).where(Turn.session_id == session_id))
-    await db.commit()
+    await delete_session_data(db, session_id)
     return None
 
 
 @app.delete("/users/{user_id}", status_code=204)
 async def delete_user(user_id: str, db: AsyncSession = Depends(get_db)):
-    # Get all sessions for this user to clean up turns
-    result = await db.execute(select(Turn.session_id).where(Turn.user_id == user_id).distinct())
-    session_ids = [r[0] for r in result.all()]
-
-    await db.execute(delete(Memory).where(Memory.user_id == user_id))
-    await db.execute(delete(Turn).where(Turn.user_id == user_id))
-    await db.commit()
+    await delete_user_data(db, user_id)
     return None

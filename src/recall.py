@@ -3,14 +3,12 @@ from __future__ import annotations
 import logging
 import re
 
-from sqlalchemy import text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.embeddings import embed_text
+from src.store import fetch_recent_turns, fetch_scope_memories, hybrid_search_memories
 
 logger = logging.getLogger(__name__)
-
-RRF_K = 60
 
 STOPWORDS = {
     "about",
@@ -61,84 +59,7 @@ async def hybrid_retrieve(
 ) -> list[dict]:
     """Hybrid retrieval: vector similarity + full-text search, fused with RRF."""
     query_embedding = embed_text(query)
-
-    # Vector search on memories
-    vector_sql = sa_text("""
-        SELECT id, type, key, value, confidence, session_id, source_turn_id, created_at, updated_at,
-               active, supersedes, superseded_by,
-               1 - (embedding <=> CAST(:embedding AS vector)) as vec_score
-        FROM memories
-        WHERE active = true
-          AND (user_id = :user_id OR (:user_id IS NULL AND session_id = :session_id))
-        ORDER BY embedding <=> CAST(:embedding AS vector)
-        LIMIT :limit
-    """)
-    vec_result = await db.execute(vector_sql, {
-        "embedding": str(query_embedding), "user_id": user_id,
-        "session_id": session_id, "limit": limit
-    })
-    vec_rows = vec_result.mappings().all()
-
-    # Full-text search on memories
-    fts_sql = sa_text("""
-        SELECT id, type, key, value, confidence, session_id, source_turn_id, created_at, updated_at,
-               active, supersedes, superseded_by,
-               ts_rank(to_tsvector('english', value), plainto_tsquery('english', :query)) as fts_score
-        FROM memories
-        WHERE active = true
-          AND (user_id = :user_id OR (:user_id IS NULL AND session_id = :session_id))
-          AND to_tsvector('english', value) @@ plainto_tsquery('english', :query)
-        ORDER BY fts_score DESC
-        LIMIT :limit
-    """)
-    fts_result = await db.execute(fts_sql, {
-        "query": query, "user_id": user_id, "session_id": session_id, "limit": limit
-    })
-    fts_rows = fts_result.mappings().all()
-
-    # RRF fusion
-    scores: dict[str, float] = {}
-    memory_map: dict[str, dict] = {}
-
-    for rank, row in enumerate(vec_rows):
-        mid = row["id"]
-        scores[mid] = scores.get(mid, 0) + 1.0 / (RRF_K + rank + 1)
-        memory_map[mid] = dict(row)
-
-    for rank, row in enumerate(fts_rows):
-        mid = row["id"]
-        scores[mid] = scores.get(mid, 0) + 1.0 / (RRF_K + rank + 1)
-        if mid not in memory_map:
-            memory_map[mid] = dict(row)
-        else:
-            memory_map[mid]["fts_score"] = row["fts_score"]
-
-    # Sort by fused score
-    ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    results = []
-    for mid, score in ranked:
-        entry = memory_map[mid]
-        entry["rrf_score"] = score
-        results.append(entry)
-
-    return results
-
-
-async def get_scope_memories(
-    db: AsyncSession, user_id: str | None, session_id: str, include_inactive: bool = False
-) -> list[dict]:
-    """Fetch memories available for Recall expansion."""
-    active_clause = "" if include_inactive else "AND active = true"
-    sql = sa_text(f"""
-        SELECT id, type, key, value, confidence, session_id, source_turn_id, created_at, updated_at,
-               active, supersedes, superseded_by
-        FROM memories
-        WHERE (user_id = :user_id OR (:user_id IS NULL AND session_id = :session_id))
-          {active_clause}
-        ORDER BY active DESC, created_at DESC
-    """)
-    result = await db.execute(sql, {"user_id": user_id, "session_id": session_id})
-    return [dict(r) for r in result.mappings().all()]
+    return await hybrid_search_memories(db, query, query_embedding, user_id, session_id, limit)
 
 
 async def build_recall_context(
@@ -151,29 +72,14 @@ async def build_recall_context(
     """Build prompt Context and Citations for /recall."""
     include_inactive = _needs_history(query)
     retrieved = await hybrid_retrieve(db, query, user_id, session_id)
-    scope_memories = await get_scope_memories(db, user_id, session_id, include_inactive)
+    scope_memories = await fetch_scope_memories(db, user_id, session_id, include_inactive)
     memories = _select_recall_memories(query, retrieved, scope_memories)
 
     if not memories:
         return "", []
 
-    recent = await get_recent_turns(db, session_id)
+    recent = await fetch_recent_turns(db, session_id)
     return assemble_context(memories, recent, max_tokens)
-
-
-async def get_recent_turns(
-    db: AsyncSession, session_id: str, limit: int = 5
-) -> list[dict]:
-    """Get recent turns from the current session for conversational context."""
-    sql = sa_text("""
-        SELECT id, content_text, timestamp
-        FROM turns
-        WHERE session_id = :session_id
-        ORDER BY timestamp DESC
-        LIMIT :limit
-    """)
-    result = await db.execute(sql, {"session_id": session_id, "limit": limit})
-    return [dict(r) for r in result.mappings().all()]
 
 
 def assemble_context(

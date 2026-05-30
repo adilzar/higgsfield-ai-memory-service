@@ -4,12 +4,12 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.embeddings import embed_text, embed_texts
 from src.extraction import extract_memories
 from src.models import Memory, Turn
+from src.store import fetch_active_memory_models
 
 
 @dataclass(frozen=True)
@@ -47,7 +47,7 @@ async def ingest_turn(db: AsyncSession, cmd: IngestTurnCommand) -> str:
     db.add(turn)
     await db.flush()
 
-    existing = await get_active_memories(db, cmd.user_id, cmd.session_id)
+    existing = await fetch_active_memory_models(db, cmd.user_id, cmd.session_id)
     extracted = extract_memories(content_text, memory_refs(existing))
     await persist_extracted_memories(db, cmd, turn_id, existing, extracted)
 
@@ -67,22 +67,6 @@ def parse_turn_timestamp(timestamp: str | None) -> datetime:
 
 def message_to_dict(message: TurnMessage) -> dict:
     return {"role": message.role, "content": message.content, "name": message.name}
-
-
-async def get_active_memories(
-    db: AsyncSession, user_id: str | None, session_id: str
-) -> list[Memory]:
-    if user_id:
-        predicate = Memory.user_id == user_id
-    else:
-        predicate = Memory.session_id == session_id
-
-    result = await db.execute(
-        select(Memory)
-        .where(predicate, Memory.active == True)
-        .order_by(Memory.created_at.desc())
-    )
-    return list(result.scalars().all())
 
 
 def memory_refs(memories: list[Memory]) -> list[dict]:
