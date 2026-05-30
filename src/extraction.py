@@ -101,7 +101,9 @@ def _parse_response(raw: str) -> list[dict]:
     if not isinstance(parsed, list):
         raise ExtractionError(f"Expected JSON array, got {type(parsed).__name__}")
 
-    return parsed
+    # Filter out malformed items missing required "value" key
+    valid = [item for item in parsed if isinstance(item, dict) and item.get("value")]
+    return valid
 
 
 def extract_memories(turn_content: str, existing_memories: list[dict]) -> ExtractionResult:
