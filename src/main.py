@@ -3,8 +3,7 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi import Depends, FastAPI
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api_models import (
@@ -14,7 +13,7 @@ from src.api_models import (
     UserMemoriesResponse,
     format_user_memories,
 )
-from src.config import settings
+from src.auth import enforce_memory_auth
 from src.database import get_db, init_db
 from src.embeddings import embed_text
 from src.intake import ingest_turn
@@ -37,16 +36,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Memory Service", lifespan=lifespan)
-
-
-# --- Auth middleware ---
-@app.middleware("http")
-async def auth_middleware(request: Request, call_next):
-    if settings.memory_auth_token:
-        auth = request.headers.get("authorization", "")
-        if request.url.path != "/health" and auth != f"Bearer {settings.memory_auth_token}":
-            return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
-    return await call_next(request)
+app.middleware("http")(enforce_memory_auth)
 
 
 # --- Endpoints ---
