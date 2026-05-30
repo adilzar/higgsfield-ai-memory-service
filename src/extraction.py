@@ -1,5 +1,7 @@
 import json
 import logging
+from dataclasses import dataclass
+
 from openai import OpenAI
 
 from src.config import settings
@@ -42,18 +44,27 @@ Rules:
 Respond with ONLY a JSON array, no other text."""
 
 
-def extract_memories(turn_content: str, existing_memories: list[dict]) -> list[dict]:
-    """Call LLM to extract structured memories from a conversation turn."""
+class ExtractionError(Exception):
+    """Raised when LLM extraction fails in a non-recoverable way."""
+    pass
+
+
+@dataclass
+class ExtractionResult:
+    memories: list[dict]
+    raw_response: str | None = None
+
+
+def _build_prompt(turn_content: str, existing_memories: list[dict]) -> str:
     existing_str = "None" if not existing_memories else json.dumps(
         [{"key": m["key"], "type": m["type"], "value": m["value"]} for m in existing_memories],
         indent=2
     )
+    return EXTRACTION_PROMPT.format(existing_memories=existing_str, turn_content=turn_content)
 
-    prompt = EXTRACTION_PROMPT.format(
-        existing_memories=existing_str,
-        turn_content=turn_content
-    )
 
+def _call_llm(prompt: str) -> str:
+    """Call the LLM and return raw response content. Raises ExtractionError on API failure."""
     client = get_llm_client()
     try:
         response = client.chat.completions.create(
@@ -62,14 +73,44 @@ def extract_memories(turn_content: str, existing_memories: list[dict]) -> list[d
             temperature=0.1,
             max_tokens=2000,
         )
-        content = response.choices[0].message.content.strip()
-        # Strip markdown code fences if present
-        if content.startswith("```"):
-            content = content.split("\n", 1)[1] if "\n" in content else content[3:]
-            if content.endswith("```"):
-                content = content[:-3]
-            content = content.strip()
-        return json.loads(content)
-    except (json.JSONDecodeError, Exception) as e:
-        logger.error(f"Extraction failed: {e}")
-        return []
+        content = response.choices[0].message.content
+        if not content:
+            raise ExtractionError("LLM returned empty content")
+        return content.strip()
+    except ExtractionError:
+        raise
+    except Exception as e:
+        raise ExtractionError(f"LLM API call failed: {e}") from e
+
+
+def _parse_response(raw: str) -> list[dict]:
+    """Parse LLM response into memory dicts. Raises ExtractionError on malformed output."""
+    content = raw
+    # Strip markdown code fences if present
+    if content.startswith("```"):
+        content = content.split("\n", 1)[1] if "\n" in content else content[3:]
+        if content.endswith("```"):
+            content = content[:-3]
+        content = content.strip()
+
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError as e:
+        raise ExtractionError(f"LLM returned invalid JSON: {e}\nRaw: {content[:200]}") from e
+
+    if not isinstance(parsed, list):
+        raise ExtractionError(f"Expected JSON array, got {type(parsed).__name__}")
+
+    return parsed
+
+
+def extract_memories(turn_content: str, existing_memories: list[dict]) -> ExtractionResult:
+    """Extract structured memories from a conversation turn.
+
+    Returns ExtractionResult with memories list (possibly empty).
+    Raises ExtractionError on failures that the caller should handle.
+    """
+    prompt = _build_prompt(turn_content, existing_memories)
+    raw = _call_llm(prompt)
+    memories = _parse_response(raw)
+    return ExtractionResult(memories=memories, raw_response=raw)

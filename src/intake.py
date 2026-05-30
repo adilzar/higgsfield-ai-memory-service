@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -7,9 +8,11 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.embeddings import embed_text, embed_texts
-from src.extraction import extract_memories
+from src.extraction import ExtractionError, extract_memories
 from src.models import Memory, Turn
 from src.store import fetch_active_memory_models
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -48,8 +51,14 @@ async def ingest_turn(db: AsyncSession, cmd: IngestTurnCommand) -> str:
     await db.flush()
 
     existing = await fetch_active_memory_models(db, cmd.user_id, cmd.session_id)
-    extracted = extract_memories(content_text, memory_refs(existing))
-    await persist_extracted_memories(db, cmd, turn_id, existing, extracted)
+    try:
+        result = extract_memories(content_text, memory_refs(existing))
+    except ExtractionError as e:
+        logger.warning("Extraction failed for turn %s: %s", turn_id, e)
+        await db.commit()
+        return turn_id
+
+    await persist_extracted_memories(db, cmd, turn_id, existing, result.memories)
 
     await db.commit()
     return turn_id
