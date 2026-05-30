@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from src.extraction import ExtractedMemory
 from src.intake import (
     IngestTurnCommand,
     TurnMessage,
@@ -92,13 +93,13 @@ async def test_persist_extracted_memories_marks_superseded(monkeypatch):
         "turn-1",
         [old],
         [
-            {
-                "type": "fact",
-                "key": "employment",
-                "value": "Works at Notion as a PM",
-                "confidence": 0.95,
-                "supersedes_key": "employment",
-            }
+            ExtractedMemory(
+                type="fact",
+                key="employment",
+                value="Works at Notion as a PM",
+                confidence=0.95,
+                supersedes_key="employment",
+            )
         ],
     )
 

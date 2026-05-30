@@ -53,11 +53,11 @@ When `POST /turns` is called:
    - Detects implicit facts ("walking Biscuit" → has a pet)
    - Identifies contradictions against existing memories
    - Returns a normalized `key` for topic deduplication
-5. **Validate** LLM output — malformed items (missing `value` key, non-dict entries) are filtered out
+5. **Validate** LLM output — malformed items (missing/non-text `value`, non-dict entries) are filtered out
 6. **Embed** each extracted memory value
 7. **Store** memories, handling supersession (mark old memory inactive, link via `supersedes`/`superseded_by`)
 
-The extraction boundary is cleanly separated: `_build_prompt`, `_call_llm`, and `_parse_response` are independent functions. Failures raise `ExtractionError` which the caller handles gracefully (turn is still stored, extraction is skipped).
+The extraction boundary is cleanly separated: `_build_prompt`, `_call_llm`, and `parse_extraction_response` are independent functions. Failures raise `ExtractionError` which the caller handles gracefully (turn is still stored, extraction is skipped).
 
 **What we extract:**
 - Personal facts (employment, location, family, pets)
@@ -156,7 +156,7 @@ This means:
 
 - **No data / cold session**: `/recall` returns `{"context": "", "citations": []}` — never errors
 - **Missing LLM API key**: Extraction raises `ExtractionError`, turn is still stored, memories won't be extracted
-- **Malformed LLM output**: Items without `value` key are filtered out; service doesn't crash
+- **Malformed LLM output**: Items without text `value` are filtered out; service doesn't crash
 - **Slow disk**: Queries may be slow but won't timeout (Postgres handles backpressure)
 - **Malformed input**: FastAPI/Pydantic returns 422 with validation errors
 - **Unicode/large payloads**: Handled gracefully — Postgres stores any valid UTF-8

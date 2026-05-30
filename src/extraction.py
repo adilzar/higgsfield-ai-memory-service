@@ -9,6 +9,7 @@ from src.config import settings
 logger = logging.getLogger(__name__)
 
 _client = None
+MEMORY_TYPES = {"fact", "preference", "opinion", "event"}
 
 
 def get_llm_client() -> OpenAI:
@@ -51,8 +52,17 @@ class ExtractionError(Exception):
 
 
 @dataclass
+class ExtractedMemory:
+    type: str
+    key: str
+    value: str
+    confidence: float = 1.0
+    supersedes_key: str | None = None
+
+
+@dataclass
 class ExtractionResult:
-    memories: list[dict]
+    memories: list[ExtractedMemory]
     raw_response: str | None = None
 
 
@@ -88,8 +98,8 @@ def _call_llm(prompt: str) -> str:
         raise ExtractionError(f"LLM API call failed: {e}") from e
 
 
-def _parse_response(raw: str) -> list[dict]:
-    """Parse LLM response into memory dicts. Raises ExtractionError on malformed output."""
+def parse_extraction_response(raw: str) -> list[ExtractedMemory]:
+    """Parse LLM response into validated memories. Raises ExtractionError on malformed output."""
     content = raw
     # Strip markdown code fences if present
     if content.startswith("```"):
@@ -106,9 +116,48 @@ def _parse_response(raw: str) -> list[dict]:
     if not isinstance(parsed, list):
         raise ExtractionError(f"Expected JSON array, got {type(parsed).__name__}")
 
-    # Filter out malformed items missing required "value" key
-    valid = [item for item in parsed if isinstance(item, dict) and item.get("value")]
-    return valid
+    return [memory for item in parsed if (memory := _coerce_memory(item)) is not None]
+
+
+def _coerce_memory(item: object) -> ExtractedMemory | None:
+    if not isinstance(item, dict):
+        return None
+
+    value = item.get("value")
+    if not isinstance(value, str) or not value.strip():
+        return None
+
+    memory_type = _coerce_text(item.get("type"), default="fact")
+    if memory_type not in MEMORY_TYPES:
+        memory_type = "fact"
+
+    supersedes_key = item.get("supersedes_key")
+    if not isinstance(supersedes_key, str) or not supersedes_key.strip():
+        supersedes_key = None
+
+    return ExtractedMemory(
+        type=memory_type,
+        key=_coerce_text(item.get("key"), default="unknown"),
+        value=value.strip(),
+        confidence=_coerce_confidence(item.get("confidence")),
+        supersedes_key=supersedes_key.strip() if supersedes_key else None,
+    )
+
+
+def _coerce_text(value: object, *, default: str) -> str:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return default
+
+
+def _coerce_confidence(value: object) -> float:
+    if isinstance(value, bool):
+        return 1.0
+    try:
+        confidence = float(value)
+    except (TypeError, ValueError):
+        return 1.0
+    return max(0.0, min(1.0, confidence))
 
 
 def extract_memories(turn_content: str, existing_memories: list[dict]) -> ExtractionResult:
@@ -119,5 +168,5 @@ def extract_memories(turn_content: str, existing_memories: list[dict]) -> Extrac
     """
     prompt = _build_prompt(turn_content, existing_memories)
     raw = _call_llm(prompt)
-    memories = _parse_response(raw)
+    memories = parse_extraction_response(raw)
     return ExtractionResult(memories=memories, raw_response=raw)

@@ -8,7 +8,7 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.embeddings import embed_text, embed_texts
-from src.extraction import ExtractionError, extract_memories
+from src.extraction import ExtractedMemory, ExtractionError, extract_memories
 from src.models import Memory, Turn
 from src.store import fetch_active_memory_models
 
@@ -87,17 +87,17 @@ async def persist_extracted_memories(
     cmd: IngestTurnCommand,
     turn_id: str,
     existing: list[Memory],
-    extracted: list[dict],
+    extracted: list[ExtractedMemory],
 ) -> None:
     if not extracted:
         return
 
-    embeddings = embed_texts([m["value"] for m in extracted])
+    embeddings = embed_texts([m.value for m in extracted])
     existing_by_key = {m.key: m for m in reversed(existing)}
 
     for index, mem_data in enumerate(extracted):
         mem_id = str(uuid.uuid4())
-        superseded = existing_by_key.get(mem_data.get("supersedes_key"))
+        superseded = existing_by_key.get(mem_data.supersedes_key)
         supersedes_id = None
 
         if superseded:
@@ -111,10 +111,10 @@ async def persist_extracted_memories(
             user_id=cmd.user_id,
             session_id=cmd.session_id,
             source_turn_id=turn_id,
-            type=mem_data.get("type", "fact"),
-            key=mem_data.get("key", "unknown"),
-            value=mem_data["value"],
-            confidence=mem_data.get("confidence", 1.0),
+            type=mem_data.type,
+            key=mem_data.key,
+            value=mem_data.value,
+            confidence=mem_data.confidence,
             active=True,
             supersedes=supersedes_id,
             embedding=embeddings[index],
