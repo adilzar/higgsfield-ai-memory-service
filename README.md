@@ -20,6 +20,8 @@ A memory service for AI agents that ingests conversation turns, extracts structu
 │                   │           │                          │
 │                   └─── RRF ───┘                          │
 │                        │                                 │
+│               Noise Gate + Intent Matching               │
+│                        │                                 │
 │                  Tiered Assembly                          │
 │              (facts → prefs → relevant → recent)         │
 └─────────────────────────────────────────────────────────┘
@@ -36,7 +38,7 @@ The service is a single Python/FastAPI process backed by PostgreSQL with pgvecto
 - Mature, battle-tested, easy to reason about
 
 **Schema:**
-- `turns` — raw conversation turns with JSONB messages, FTS index, and embedding
+- `turns` — raw conversation turns with JSONB messages, FTS index, and embedding (timezone-aware timestamps)
 - `memories` — extracted structured knowledge with type, key, value, confidence, active flag, supersession pointers, and embedding
 
 ## Extraction Pipeline
@@ -51,8 +53,11 @@ When `POST /turns` is called:
    - Detects implicit facts ("walking Biscuit" → has a pet)
    - Identifies contradictions against existing memories
    - Returns a normalized `key` for topic deduplication
-5. **Embed** each extracted memory value
-6. **Store** memories, handling supersession (mark old memory inactive, link via `supersedes`/`superseded_by`)
+5. **Validate** LLM output — malformed items (missing `value` key, non-dict entries) are filtered out
+6. **Embed** each extracted memory value
+7. **Store** memories, handling supersession (mark old memory inactive, link via `supersedes`/`superseded_by`)
+
+The extraction boundary is cleanly separated: `_build_prompt`, `_call_llm`, and `_parse_response` are independent functions. Failures raise `ExtractionError` which the caller handles gracefully (turn is still stored, extraction is skipped).
 
 **What we extract:**
 - Personal facts (employment, location, family, pets)
@@ -60,6 +65,7 @@ When `POST /turns` is called:
 - Opinions (with evolution tracking)
 - Events (debugging sessions, interviews, moves)
 - Corrections ("actually, I meant...")
+- Implicit facts ("walking Biscuit this morning" → has a pet named Biscuit)
 
 **What we might miss:**
 - Very subtle implications requiring multi-turn reasoning
@@ -68,7 +74,7 @@ When `POST /turns` is called:
 
 ## Recall Strategy
 
-`POST /recall` uses a three-stage pipeline:
+`POST /recall` uses a multi-stage pipeline:
 
 ### Stage 1: Hybrid Retrieve
 - **Vector search**: Embed query → cosine similarity against memory embeddings (top-20)
@@ -80,15 +86,29 @@ Reciprocal Rank Fusion combines both result sets: `score = Σ 1/(60 + rank_i)`
 
 This handles both semantic queries ("tell me about their career") and keyword queries ("what's their dog's name?") well.
 
-### Stage 3: Tiered Assembly
+### Stage 3: Noise Gate + Intent Matching
+Retrieved memories pass through a noise gate that prevents returning irrelevant results:
+- **Vector similarity threshold** (≥0.45): semantically relevant memories pass regardless of keyword overlap
+- **FTS score**: keyword matches pass
+- **Token overlap**: direct word matches between query and memory
+- **Intent matching**: query terms map to intent categories (employment, location, pet, diet, etc.) which match against memory keys
+
+Special query types:
+- **Profile queries** ("Tell me about this user"): return all stable facts without filtering
+- **History queries** ("career history"): include superseded memories for the full arc
+
+### Stage 4: Anchor Expansion
+Once initial relevant memories are selected, the system expands to include related memories. If a query mentions "dog named Biscuit", the pet memory anchors expansion to also surface the user's location — enabling multi-hop recall.
+
+### Stage 5: Tiered Assembly
 Context is assembled in priority order, stopping when `max_tokens` is reached:
 
-1. **Tier 1 — Facts** (employment, location, pets): Always included first
-2. **Tier 2 — Preferences** (communication style, dietary): High priority
-3. **Tier 3 — Query-relevant** (opinions, events): Ranked by RRF score
-4. **Tier 4 — Recent turns** (last 5 from current session): Conversational continuity
+1. **Tier 1 — Facts** (employment, location, pets): ~50% of budget, always included first
+2. **Tier 2 — Preferences** (communication style, dietary): ~25% of budget
+3. **Tier 3 — Query-relevant** (opinions, events): remaining budget, ranked by RRF score
+4. **Tier 4 — Recent turns** (last 5 from current session): conversational continuity, cut first
 
-**Budget logic:** When `max_tokens` is tight, facts get ~50% of budget, then preferences, then relevant memories fill the rest. Recent context is last priority and gets cut first.
+**Budget logic:** When `max_tokens` is tight, facts get priority positioning. Within each tier, items are capped (15 facts, 10 preferences, 10 relevant). Recent context is last priority and gets cut first.
 
 ## Fact Evolution
 
@@ -99,11 +119,15 @@ Context is assembled in priority order, stopping when `max_tokens` is reached:
 - `/recall` only surfaces active memories
 - `/users/{user_id}/memories` shows the full history including superseded entries
 
+**Session deletion and supersession integrity:**
+- When a session is deleted, any memories that were superseded by memories in that session are reactivated
+- This prevents "orphaned" inactive memories with dangling pointers
+
 **Opinion arcs** (e.g., TypeScript opinions evolving):
 - Each new opinion supersedes the previous one
 - The latest opinion is what `/recall` returns
 - The full arc is preserved in the supersession chain
-- This is a simplification — a more sophisticated system could summarize the arc
+- History queries can surface the full arc
 
 **Corrections** ("actually, I meant..."):
 - Treated the same as contradictions — the correction supersedes the incorrect fact
@@ -126,14 +150,17 @@ This means:
 | Simplicity (single store) | Horizontal scalability |
 | Local embeddings (no API key) | Embedding quality vs. OpenAI |
 | Hybrid retrieval (vector + FTS) | Complexity vs. pure vector |
+| Noise resistance (intent gate) | May miss edge-case semantic matches |
 
 ## Failure Modes
 
 - **No data / cold session**: `/recall` returns `{"context": "", "citations": []}` — never errors
-- **Missing LLM API key**: Extraction returns empty list, turns are still stored (memories just won't be extracted)
+- **Missing LLM API key**: Extraction raises `ExtractionError`, turn is still stored, memories won't be extracted
+- **Malformed LLM output**: Items without `value` key are filtered out; service doesn't crash
 - **Slow disk**: Queries may be slow but won't timeout (Postgres handles backpressure)
 - **Malformed input**: FastAPI/Pydantic returns 422 with validation errors
 - **Unicode/large payloads**: Handled gracefully — Postgres stores any valid UTF-8
+- **Session delete with supersession**: Superseded memories are reactivated, no data loss
 
 ## Running
 
@@ -155,20 +182,40 @@ pytest tests/ -v
 
 ## Running Tests
 
-Tests are integration tests that run against the live service:
+Tests run against the live service:
 
 ```bash
 # Start the service first
 docker compose up -d
 
-# Run all tests
+# Run all tests (unit + integration + e2e)
 pytest tests/ -v
 
-# Run just the recall quality fixture
-pytest tests/test_service.py::TestRecallQuality -v -s
+# Run specific test suites
+pytest tests/test_e2e.py -v -s          # End-to-end scenarios
+pytest tests/test_service.py -v -s       # Contract + recall quality fixture
+pytest tests/test_recall_unit.py -v      # Recall logic unit tests
+
+# Run restart persistence test (requires docker access)
+RUN_RESTART_TESTS=1 python3 -m unittest tests.test_restart_persistence -v
 ```
 
-The recall quality test ingests the fixture conversations, runs probe queries, and reports how many expected facts were found in the recall context.
+Test coverage:
+- **Contract**: roundtrip, empty session, search, memories endpoint, delete
+- **Malformed input**: invalid JSON, missing fields, unicode, empty messages
+- **Concurrent sessions**: user isolation
+- **Recall quality**: fixture-based probe queries with expected facts
+- **E2E**: fact evolution, cross-session knowledge, token budget, multi-hop, session delete, implicit facts, multi-message turns
+- **Restart persistence**: data survives `docker compose restart`
+
+## Code Quality
+
+The codebase is formatted with `black` (line-length=100) and `isort` (black profile). Configuration is in `pyproject.toml`.
+
+```bash
+python3 -m black src/ tests/
+python3 -m isort src/ tests/
+```
 
 ## Environment Variables
 
