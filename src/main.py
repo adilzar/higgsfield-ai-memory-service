@@ -16,7 +16,7 @@ from src.database import async_session, get_db, init_db
 from src.embeddings import embed_text, embed_texts
 from src.extraction import extract_memories
 from src.models import Memory, Turn
-from src.recall import assemble_context, get_recent_turns, hybrid_retrieve
+from src.recall import build_recall_context
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -157,9 +157,9 @@ async def create_turn(req: TurnRequest, db: AsyncSession = Depends(get_db)):
 
 @app.post("/recall")
 async def recall(req: RecallRequest, db: AsyncSession = Depends(get_db)):
-    memories = await hybrid_retrieve(db, req.query, req.user_id, req.session_id)
-    recent = await get_recent_turns(db, req.session_id)
-    context, citations = assemble_context(memories, recent, req.max_tokens)
+    context, citations = await build_recall_context(
+        db, req.query, req.user_id, req.session_id, req.max_tokens
+    )
     return {"context": context, "citations": citations}
 
 
