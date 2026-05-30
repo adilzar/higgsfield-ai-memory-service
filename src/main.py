@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
@@ -65,14 +65,14 @@ class RecallRequest(BaseModel):
     query: str
     session_id: str
     user_id: str | None = None
-    max_tokens: int = 1024
+    max_tokens: int = Field(default=1024, gt=0)
 
 
 class SearchRequest(BaseModel):
     query: str
     session_id: str | None = None
     user_id: str | None = None
-    limit: int = 10
+    limit: int = Field(default=10, gt=0)
 
 
 # --- Endpoints ---

@@ -146,6 +146,23 @@ class TestMalformedInput:
         r = client.post("/turns", json={"session_id": "x"})
         assert r.status_code == 422
 
+    def test_invalid_recall_budget(self, client):
+        r = client.post("/recall", json={
+            "query": "anything",
+            "session_id": "test-contract-session",
+            "user_id": "test-contract-user",
+            "max_tokens": 0,
+        })
+        assert r.status_code == 422
+
+    def test_invalid_search_limit(self, client):
+        r = client.post("/search", json={
+            "query": "anything",
+            "user_id": "test-contract-user",
+            "limit": 0,
+        })
+        assert r.status_code == 422
+
     def test_unicode_content(self, client):
         """Unicode doesn't crash the service."""
         r = client.post("/turns", json={
