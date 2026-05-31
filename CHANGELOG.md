@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## v10 — Configurable database and LLM credentials
+
+**What:** Added granular env vars for database connection (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`) alongside the existing `DATABASE_URL` override. Docker Compose now passes these to both the Postgres container and the service.
+
+**Why:** The eval team needs to provide their own credentials without editing code. Individual fields are easier to override in CI/CD than constructing a full connection string. The `DATABASE_URL` override remains for users who prefer a single string.
+
+**Result:** Service connects using env vars by default, falls back to building the URL from individual fields. Both Postgres and the app container share the same credential source.
+
+## v9 — Directory structure: src/ and tests/ packages
+
+**What:** Organized `src/` into `api/`, `recall/`, `storage/`, and `core/` packages. Organized `tests/` into `unit/`, `integration/`, and `e2e/` directories.
+
+**Why:** 16 flat files in `src/` made navigation harder as the codebase grew. The packages group by concern: HTTP layer (`api/`), recall pipeline (`recall/`), persistence (`storage/`), and configuration (`core/`). Tests mirror this with clear separation of fast unit tests from slow integration/e2e tests.
+
+**Result:** Each package has a single responsibility. Tests can be run selectively: `pytest tests/unit/` for fast feedback, `pytest tests/e2e/` for full scenarios.
+
 ## v8 — Code quality: black + isort formatting
 
 **What:** Applied `black` (line-length=100) and `isort` (black profile) across the entire codebase. Added `pyproject.toml` for consistent config.

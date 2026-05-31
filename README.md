@@ -29,6 +29,40 @@ A memory service for AI agents that ingests conversation turns, extracts structu
 
 The service is a single Python/FastAPI process backed by PostgreSQL with pgvector. All extraction, embedding, and retrieval happens synchronously within request handlers.
 
+## Project Structure
+
+```
+src/
+├── main.py              # entry point
+├── core/
+│   └── config.py        # settings (env vars)
+├── api/                 # HTTP layer
+│   ├── app.py           # FastAPI app factory
+│   ├── auth.py          # auth middleware
+│   ├── bootstrap.py     # startup/lifespan
+│   ├── routes.py        # endpoint handlers
+│   └── schemas.py       # request/response models
+├── recall/              # recall pipeline
+│   ├── selection.py     # noise gate, intent matching
+│   ├── retrieval.py     # hybrid search
+│   ├── ranking.py       # RRF fusion
+│   └── budget.py        # tiered assembly
+├── storage/             # persistence
+│   ├── database.py      # DB engine + session
+│   ├── models.py        # ORM models
+│   └── store.py         # data access (fetches)
+├── extraction.py        # LLM extraction pipeline
+├── intake.py            # turn ingestion orchestration
+├── lifecycle.py         # session/user delete + supersession repair
+├── search.py            # /search endpoint logic
+└── embeddings.py        # local embedding model
+
+tests/
+├── unit/                # pure logic (no network, no DB)
+├── integration/         # tests hitting the live service
+└── e2e/                 # multi-turn scenario tests
+```
+
 ## Backing Store: PostgreSQL + pgvector
 
 **Why Postgres:**
@@ -193,12 +227,12 @@ docker compose up -d
 pytest tests/ -v
 
 # Run specific test suites
-pytest tests/test_e2e.py -v -s          # End-to-end scenarios
-pytest tests/test_service.py -v -s       # Contract + recall quality fixture
-pytest tests/test_recall_unit.py -v      # Recall logic unit tests
+pytest tests/e2e/ -v -s          # End-to-end scenarios
+pytest tests/integration/ -v -s  # Contract + recall quality fixture
+pytest tests/unit/ -v            # Recall logic unit tests
 
 # Run restart persistence test (requires docker access)
-RUN_RESTART_TESTS=1 python3 -m unittest tests.test_restart_persistence -v
+RUN_RESTART_TESTS=1 python3 -m unittest tests.integration.test_restart_persistence -v
 ```
 
 Test coverage:
@@ -222,7 +256,14 @@ python3 -m isort src/ tests/
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
+| `DB_HOST` | No | `db` | PostgreSQL host |
+| `DB_PORT` | No | `5432` | PostgreSQL port |
+| `DB_NAME` | No | `memory` | Database name |
+| `DB_USER` | No | `memory` | Database user |
+| `DB_PASSWORD` | No | `memory` | Database password |
+| `DATABASE_URL` | No | _(built from above)_ | Full connection string override |
 | `LLM_BASE_URL` | No | `https://openrouter.ai/api/v1` | OpenAI-compatible API endpoint |
 | `LLM_API_KEY` | Yes | — | API key for the LLM provider |
 | `LLM_MODEL` | No | `deepseek/deepseek-v4-flash` | Model identifier |
+| `EMBEDDING_MODEL` | No | `all-MiniLM-L6-v2` | Local embedding model name |
 | `MEMORY_AUTH_TOKEN` | No | — | Optional Bearer token for auth |
