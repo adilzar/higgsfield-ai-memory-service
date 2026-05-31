@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable, Callable
 
-from src.storage.database import init_db
 from src.core.embeddings import embed_text
+from src.storage.database import init_db
 
 logger = logging.getLogger(__name__)
 

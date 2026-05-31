@@ -8,9 +8,9 @@ from src.api.schemas import (
     format_timestamp,
     format_user_memories,
 )
+from src.core.search import SearchMemoriesCommand
 from src.ingestion.intake import IngestTurnCommand, TurnMessage
 from src.recall import RecallContextCommand
-from src.core.search import SearchMemoriesCommand
 
 
 def test_turn_request_builds_ingest_command():
