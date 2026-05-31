@@ -34,7 +34,7 @@ async def test_persist_extracted_memories_marks_superseded(monkeypatch):
             self.added.append(obj)
 
     monkeypatch.setattr(
-        "src.memory_write.embed_texts", lambda values: [[0.0] * 384 for _ in values]
+        "src.ingestion.memory_write.embed_texts", lambda values: [[0.0] * 384 for _ in values]
     )
 
     db = FakeDb()

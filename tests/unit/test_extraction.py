@@ -60,7 +60,7 @@ def test_parse_response_normalizes_optional_fields():
 
 def test_extract_memories_returns_raw_response(monkeypatch):
     monkeypatch.setattr(
-        "src.extraction._call_llm",
+        "src.ingestion.extraction._call_llm",
         lambda prompt: '[{"type":"preference","key":"style","value":"Prefers concise replies"}]',
     )
 
