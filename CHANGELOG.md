@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## v13 — License and public repository docs
+
+**What:** Added an MIT `LICENSE` file and updated repository documentation to reflect the current package layout and test workflow.
+
+**Why:** The GitHub repository should be self-contained for evaluators: license, architecture, current module map, and runnable test commands all in one place.
+
+**Result:** The project now documents its license and the README matches the tracked `src/` package structure.
+
+## v12 — Deep Extraction interface
+
+**What:** Introduced typed `ExtractionRequest`, `MemoryReference`, and error-bearing `ExtractionResult`. Moved Memory Reference construction and Extraction failure policy behind the Extraction seam. Removed the prompt-shaped `memory_refs` helper from Memory persistence.
+
+**Why:** `intake.py` still had to know about prompt inputs, raw LLM failure modes, and parser errors. That made Extraction shallow: the interface leaked nearly as much detail as the implementation.
+
+**Result:** Turn ingestion calls one Extraction interface and persists the Turn even when Extraction returns an error. Prompt construction, LLM transport, response cleanup, JSON parsing, validation, and known failure handling are localized in `src/ingestion/extraction.py`. Full Docker suite: 71 passed, 1 skipped.
+
+## v11 — Typed Memory Row interface
+
+**What:** Added `MemoryRow` and `RecentTurnRow` typed row interfaces in `src/storage/rows.py`. Updated Storage, Retrieval, Ranking, Recall planning, Context assembly, Search formatting, and tests to use attributes instead of raw row dictionaries.
+
+**Why:** Raw database dictionaries leaked through Recall, Search, and Context assembly. Every caller needed to know row keys, optional scores, timestamps, and active state.
+
+**Result:** Database mapping is localized at the Storage seam. Recall and Search code now share a typed in-process Memory Row interface while HTTP responses remain plain JSON at the route seam. Full Docker suite: 70 passed, 1 skipped.
+
 ## v10 — Configurable database and LLM credentials
 
 **What:** Added granular env vars for database connection (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`) alongside the existing `DATABASE_URL` override. Docker Compose now passes these to both the Postgres container and the service.

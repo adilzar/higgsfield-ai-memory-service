@@ -34,8 +34,15 @@ The service is a single Python/FastAPI process backed by PostgreSQL with pgvecto
 ```
 src/
 ├── main.py              # entry point
+├── ingestion/           # turn intake and memory extraction
+│   ├── extraction.py    # typed Extraction seam + LLM adapter
+│   ├── intake.py        # turn ingestion orchestration
+│   └── memory_write.py  # Memory persistence and supersession writes
 ├── core/
-│   └── config.py        # settings (env vars)
+│   ├── config.py        # settings (env vars)
+│   ├── embeddings.py    # local embedding model
+│   ├── lifecycle.py     # session/user delete + supersession repair
+│   └── search.py        # /search endpoint logic
 ├── api/                 # HTTP layer
 │   ├── app.py           # FastAPI app factory
 │   ├── auth.py          # auth middleware
@@ -43,19 +50,16 @@ src/
 │   ├── routes.py        # endpoint handlers
 │   └── schemas.py       # request/response models
 ├── recall/              # recall pipeline
-│   ├── selection.py     # noise gate, intent matching
+│   ├── selection.py     # Recall orchestration
+│   ├── planning.py      # noise gate, intent matching, expansion plan
 │   ├── retrieval.py     # hybrid search
 │   ├── ranking.py       # RRF fusion
 │   └── budget.py        # tiered assembly
-├── storage/             # persistence
-│   ├── database.py      # DB engine + session
-│   ├── models.py        # ORM models
-│   └── store.py         # data access (fetches)
-├── extraction.py        # LLM extraction pipeline
-├── intake.py            # turn ingestion orchestration
-├── lifecycle.py         # session/user delete + supersession repair
-├── search.py            # /search endpoint logic
-└── embeddings.py        # local embedding model
+└── storage/             # persistence
+    ├── database.py      # DB engine + session
+    ├── models.py        # ORM models
+    ├── rows.py          # typed query row interfaces
+    └── store.py         # data access (fetches)
 
 tests/
 ├── unit/                # pure logic (no network, no DB)
@@ -147,6 +151,10 @@ Context is assembled in priority order, stopping when `max_tokens` is reached:
 
 **Budget logic:** When `max_tokens` is tight, facts get priority positioning. Within each tier, items are capped (15 facts, 10 preferences, 10 relevant). Recent context is last priority and gets cut first.
 
+Internally, Recall, Search, and Context assembly use typed `MemoryRow` and
+`RecentTurnRow` interfaces instead of raw database row dictionaries. HTTP
+responses remain plain JSON at the route seam.
+
 ## Fact Evolution
 
 **Simple contradictions** (employment, location):
@@ -213,9 +221,7 @@ docker compose up -d
 # Wait for health
 until curl -sf http://localhost:8080/health; do sleep 1; done
 
-# Run tests (requires service running)
-pip install httpx pytest
-pytest tests/ -v
+# Run tests with the Docker commands in the next section
 ```
 
 ## Running Tests
@@ -223,16 +229,19 @@ pytest tests/ -v
 Tests run against the live service:
 
 ```bash
-# Start the service first
-docker compose up -d
+# Rebuild and start the service
+docker compose up -d --build service
+
+# Copy local tests into the running service container
+docker compose cp tests/. service:/app/tests
 
 # Run all tests (unit + integration + e2e)
-pytest tests/ -v
+docker compose exec -T service python -m pytest tests -q
 
 # Run specific test suites
-pytest tests/e2e/ -v -s          # End-to-end scenarios
-pytest tests/integration/ -v -s  # Contract + recall quality fixture
-pytest tests/unit/ -v            # Recall logic unit tests
+docker compose exec -T service python -m pytest tests/unit -q
+docker compose exec -T service python -m pytest tests/integration -q
+docker compose exec -T service python -m pytest tests/e2e -q
 
 # Run restart persistence test (requires docker access)
 RUN_RESTART_TESTS=1 python3 -m unittest tests.integration.test_restart_persistence -v
@@ -270,3 +279,7 @@ python3 -m isort src/ tests/
 | `LLM_MODEL` | No | `deepseek/deepseek-v4-flash` | Model identifier |
 | `EMBEDDING_MODEL` | No | `all-MiniLM-L6-v2` | Local embedding model name |
 | `MEMORY_AUTH_TOKEN` | No | — | Optional Bearer token for auth |
+
+## License
+
+MIT. See `LICENSE`.
