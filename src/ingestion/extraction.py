@@ -1,12 +1,11 @@
 import json
-import logging
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from typing import Any
 
 from openai import OpenAI
 
 from src.core.config import settings
-
-logger = logging.getLogger(__name__)
 
 _client = None
 MEMORY_TYPES = {"fact", "preference", "opinion", "event"}
@@ -46,12 +45,12 @@ Respond with ONLY a JSON array, no other text."""
 
 
 class ExtractionError(Exception):
-    """Raised when LLM extraction fails in a non-recoverable way."""
+    """Raised inside Extraction before being converted to an error result."""
 
     pass
 
 
-@dataclass
+@dataclass(frozen=True)
 class ExtractedMemory:
     type: str
     key: str
@@ -60,22 +59,59 @@ class ExtractedMemory:
     supersedes_key: str | None = None
 
 
-@dataclass
+@dataclass(frozen=True)
+class MemoryReference:
+    key: str
+    type: str
+    value: str
+
+    @classmethod
+    def from_memory(cls, memory: Any) -> "MemoryReference":
+        return cls(key=memory.key, type=memory.type, value=memory.value)
+
+    def to_prompt_dict(self) -> dict[str, str]:
+        return {"key": self.key, "type": self.type, "value": self.value}
+
+
+@dataclass(frozen=True)
+class ExtractionRequest:
+    turn_content: str
+    existing_memories: tuple[MemoryReference, ...] = ()
+
+    @classmethod
+    def from_memories(
+        cls, turn_content: str, existing_memories: Iterable[Any]
+    ) -> "ExtractionRequest":
+        return cls(
+            turn_content=turn_content,
+            existing_memories=tuple(MemoryReference.from_memory(m) for m in existing_memories),
+        )
+
+
+@dataclass(frozen=True)
 class ExtractionResult:
     memories: list[ExtractedMemory]
     raw_response: str | None = None
+    error: str | None = None
+
+    @property
+    def failed(self) -> bool:
+        return self.error is not None
 
 
-def _build_prompt(turn_content: str, existing_memories: list[dict]) -> str:
+def _build_prompt(request: ExtractionRequest) -> str:
     existing_str = (
         "None"
-        if not existing_memories
+        if not request.existing_memories
         else json.dumps(
-            [{"key": m["key"], "type": m["type"], "value": m["value"]} for m in existing_memories],
+            [memory.to_prompt_dict() for memory in request.existing_memories],
             indent=2,
         )
     )
-    return EXTRACTION_PROMPT.format(existing_memories=existing_str, turn_content=turn_content)
+    return EXTRACTION_PROMPT.format(
+        existing_memories=existing_str,
+        turn_content=request.turn_content,
+    )
 
 
 def _call_llm(prompt: str) -> str:
@@ -160,13 +196,18 @@ def _coerce_confidence(value: object) -> float:
     return max(0.0, min(1.0, confidence))
 
 
-def extract_memories(turn_content: str, existing_memories: list[dict]) -> ExtractionResult:
+def extract_memories(
+    request: ExtractionRequest,
+    llm_call: Callable[[str], str] = _call_llm,
+) -> ExtractionResult:
     """Extract structured memories from a conversation turn.
 
-    Returns ExtractionResult with memories list (possibly empty).
-    Raises ExtractionError on failures that the caller should handle.
+    Extraction failures return an error-bearing result with no memories.
     """
-    prompt = _build_prompt(turn_content, existing_memories)
-    raw = _call_llm(prompt)
-    memories = parse_extraction_response(raw)
+    prompt = _build_prompt(request)
+    try:
+        raw = llm_call(prompt)
+        memories = parse_extraction_response(raw)
+    except ExtractionError as e:
+        return ExtractionResult(memories=[], error=str(e))
     return ExtractionResult(memories=memories, raw_response=raw)

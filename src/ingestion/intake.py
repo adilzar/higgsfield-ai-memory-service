@@ -8,8 +8,8 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.embeddings import embed_text
-from src.ingestion.extraction import ExtractionError, extract_memories
-from src.ingestion.memory_write import MemoryWriteContext, memory_refs, persist_extracted_memories
+from src.ingestion.extraction import ExtractionRequest, extract_memories
+from src.ingestion.memory_write import MemoryWriteContext, persist_extracted_memories
 from src.storage.models import Turn
 from src.storage.store import fetch_active_memory_models
 
@@ -52,12 +52,9 @@ async def ingest_turn(db: AsyncSession, cmd: IngestTurnCommand) -> str:
     await db.flush()
 
     existing = await fetch_active_memory_models(db, cmd.user_id, cmd.session_id)
-    try:
-        result = extract_memories(content_text, memory_refs(existing))
-    except ExtractionError as e:
-        logger.warning("Extraction failed for turn %s: %s", turn_id, e)
-        await db.commit()
-        return turn_id
+    result = extract_memories(ExtractionRequest.from_memories(content_text, existing))
+    if result.failed:
+        logger.warning("Extraction failed for turn %s: %s", turn_id, result.error)
 
     await persist_extracted_memories(
         db,

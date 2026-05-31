@@ -91,7 +91,10 @@ When `POST /turns` is called:
 6. **Embed** each extracted memory value
 7. **Store** memories, handling supersession (mark old memory inactive, link via `supersedes`/`superseded_by`)
 
-The extraction boundary is cleanly separated: `_build_prompt`, `_call_llm`, and `parse_extraction_response` are independent functions. Failures raise `ExtractionError` which the caller handles gracefully (turn is still stored, extraction is skipped).
+The Extraction seam accepts a typed request containing Turn text and Memory References.
+Prompt construction, LLM transport, response cleanup, JSON parsing, validation, and known
+failure handling sit behind that interface. Failures return an error-bearing result with
+no candidate Memory records, so the Turn is still stored and Memory persistence is skipped.
 
 **What we extract:**
 - Personal facts (employment, location, family, pets)
@@ -190,7 +193,7 @@ This means:
 ## Failure Modes
 
 - **No data / cold session**: `/recall` returns `{"context": "", "citations": []}` — never errors
-- **Missing LLM API key**: Extraction raises `ExtractionError`, turn is still stored, memories won't be extracted
+- **Missing LLM API key**: Extraction returns an error result, turn is still stored, memories won't be extracted
 - **Malformed LLM output**: Items without text `value` are filtered out; service doesn't crash
 - **Slow disk**: Queries may be slow but won't timeout (Postgres handles backpressure)
 - **Malformed input**: FastAPI/Pydantic returns 422 with validation errors

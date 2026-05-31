@@ -3,6 +3,8 @@ import pytest
 from src.ingestion.extraction import (
     ExtractedMemory,
     ExtractionError,
+    ExtractionRequest,
+    MemoryReference,
     extract_memories,
     parse_extraction_response,
 )
@@ -58,17 +60,34 @@ def test_parse_response_normalizes_optional_fields():
     ]
 
 
-def test_extract_memories_returns_raw_response(monkeypatch):
-    monkeypatch.setattr(
-        "src.ingestion.extraction._call_llm",
-        lambda prompt: '[{"type":"preference","key":"style","value":"Prefers concise replies"}]',
+def test_extraction_request_builds_memory_references():
+    class Memory:
+        key = "employment"
+        type = "fact"
+        value = "Works at Stripe"
+
+    request = ExtractionRequest.from_memories("user: I work at Notion.", [Memory()])
+
+    assert request == ExtractionRequest(
+        turn_content="user: I work at Notion.",
+        existing_memories=(
+            MemoryReference(key="employment", type="fact", value="Works at Stripe"),
+        ),
     )
 
-    result = extract_memories("user: Keep it short.", [])
+
+def test_extract_memories_returns_raw_response():
+    result = extract_memories(
+        ExtractionRequest("user: Keep it short."),
+        llm_call=lambda prompt: (
+            '[{"type":"preference","key":"style","value":"Prefers concise replies"}]'
+        ),
+    )
 
     assert result.raw_response == (
         '[{"type":"preference","key":"style","value":"Prefers concise replies"}]'
     )
+    assert result.error is None
     assert result.memories == [
         ExtractedMemory(
             type="preference",
@@ -77,3 +96,15 @@ def test_extract_memories_returns_raw_response(monkeypatch):
             confidence=1.0,
         )
     ]
+
+
+def test_extract_memories_keeps_failure_in_result():
+    result = extract_memories(
+        ExtractionRequest("user: Keep it short."),
+        llm_call=lambda prompt: "not json",
+    )
+
+    assert result.failed is True
+    assert result.memories == []
+    assert result.error is not None
+    assert "invalid JSON" in result.error

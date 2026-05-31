@@ -3,25 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from src.ingestion.extraction import ExtractedMemory
-from src.ingestion.memory_write import MemoryWriteContext, memory_refs, persist_extracted_memories
-
-
-def test_memory_refs_exposes_extraction_context():
-    old = SimpleNamespace(
-        id="mem-1",
-        key="employment",
-        type="fact",
-        value="Works at Stripe as an engineer",
-    )
-
-    assert memory_refs([old]) == [
-        {
-            "id": "mem-1",
-            "key": "employment",
-            "type": "fact",
-            "value": "Works at Stripe as an engineer",
-        }
-    ]
+from src.ingestion.memory_write import MemoryWriteContext, persist_extracted_memories
 
 
 @pytest.mark.asyncio

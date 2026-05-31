@@ -16,6 +16,14 @@ _Avoid_: Raw chunk, note, embedding record
 Typed in-process representation of Memory data selected from storage and passed through Recall, Search, and Context assembly.
 _Avoid_: Untyped row dict, raw mapping
 
+**Memory Reference**:
+Compact view of existing Memory passed into Extraction so it can detect corrections and supersession.
+_Avoid_: Prompt dict, extraction context blob
+
+**Extraction**:
+The process that turns Turn text and existing Memory References into candidate Memory records.
+_Avoid_: LLM call, prompt parsing
+
 **Memory Lifecycle**:
 Rules that preserve Memory active state and supersession links when Turns, Sessions, or Users are deleted.
 _Avoid_: Cleanup, cascade logic

@@ -18,10 +18,6 @@ class MemoryWriteContext:
     source_turn_id: str
 
 
-def memory_refs(memories: list[Memory]) -> list[dict]:
-    return [{"id": m.id, "key": m.key, "type": m.type, "value": m.value} for m in memories]
-
-
 async def persist_extracted_memories(
     db: AsyncSession,
     context: MemoryWriteContext,
