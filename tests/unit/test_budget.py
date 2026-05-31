@@ -1,4 +1,5 @@
 from src.recall.budget import assemble_context, estimate_tokens
+from src.storage.rows import MemoryRow, RecentTurnRow
 
 
 def memory(
@@ -7,30 +8,30 @@ def memory(
     value: str,
     *,
     active: bool = True,
-) -> dict:
-    return {
-        "id": id_,
-        "type": type_,
-        "key": type_,
-        "value": value,
-        "confidence": 1.0,
-        "session_id": "session-1",
-        "source_turn_id": f"turn-{id_}",
-        "created_at": "2025-03-01T10:00:00",
-        "updated_at": "2025-03-01T10:00:00",
-        "active": active,
-        "rrf_score": 0.1,
-    }
+) -> MemoryRow:
+    return MemoryRow(
+        id=id_,
+        type=type_,
+        key=type_,
+        value=value,
+        confidence=1.0,
+        session_id="session-1",
+        source_turn_id=f"turn-{id_}",
+        created_at="2025-03-01T10:00:00",
+        updated_at="2025-03-01T10:00:00",
+        active=active,
+        rrf_score=0.1,
+    )
 
 
 def test_tight_budget_keeps_fact_before_recent_turn():
     memories = [memory("1", "fact", "Lives in Berlin")]
     recent_turns = [
-        {
-            "id": "recent-1",
-            "content_text": "assistant: Long recent conversation that should be cut first",
-            "timestamp": "2025-03-02T10:00:00",
-        }
+        RecentTurnRow(
+            id="recent-1",
+            content_text="assistant: Long recent conversation that should be cut first",
+            timestamp="2025-03-02T10:00:00",
+        )
     ]
 
     context, citations = assemble_context(memories, recent_turns, max_tokens=12)

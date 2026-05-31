@@ -6,6 +6,7 @@ from sqlalchemy import text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.recall.ranking import fuse_ranked_memory_rows
+from src.storage.rows import MemoryRow
 
 
 def recall_memory_scope(user_id: str | None, session_id: str) -> tuple[str, dict]:
@@ -37,7 +38,7 @@ async def hybrid_search_memories(
     user_id: str | None,
     session_id: str,
     limit: int,
-) -> list[dict]:
+) -> list[MemoryRow]:
     """Hybrid search scoped for /recall."""
     where, scope_params = recall_memory_scope(user_id, session_id)
     return await _hybrid_search(db, query, query_embedding, where, scope_params, limit)
@@ -50,7 +51,7 @@ async def hybrid_search_filtered_memories(
     user_id: str | None,
     session_id: str | None,
     limit: int,
-) -> list[dict]:
+) -> list[MemoryRow]:
     """Hybrid search scoped for /search."""
     where, scope_params = filtered_memory_scope(user_id, session_id)
     return await _hybrid_search(db, query, query_embedding, where, scope_params, limit)
@@ -63,7 +64,7 @@ async def _hybrid_search(
     where: str,
     scope_params: dict,
     limit: int,
-) -> list[dict]:
+) -> list[MemoryRow]:
     params = {
         **scope_params,
         "embedding": str(query_embedding),
@@ -81,7 +82,7 @@ async def _hybrid_search(
         LIMIT :limit
     """)
     vec_result = await db.execute(vector_sql, params)
-    vec_rows = [dict(row) for row in vec_result.mappings().all()]
+    vec_rows = [MemoryRow.from_mapping(row) for row in vec_result.mappings().all()]
 
     fts_sql = sa_text(f"""
         SELECT id, type, key, value, confidence, session_id, source_turn_id, created_at, updated_at,
@@ -94,6 +95,6 @@ async def _hybrid_search(
         LIMIT :limit
     """)
     fts_result = await db.execute(fts_sql, params)
-    fts_rows = [dict(row) for row in fts_result.mappings().all()]
+    fts_rows = [MemoryRow.from_mapping(row) for row in fts_result.mappings().all()]
 
     return fuse_ranked_memory_rows(vec_rows, fts_rows)

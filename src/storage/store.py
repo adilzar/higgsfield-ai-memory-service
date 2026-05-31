@@ -7,6 +7,7 @@ from sqlalchemy import text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.storage.models import Memory
+from src.storage.rows import MemoryRow, RecentTurnRow
 
 
 async def fetch_active_memory_models(
@@ -28,7 +29,7 @@ async def fetch_scope_memories(
     user_id: str | None,
     session_id: str,
     include_inactive: bool = False,
-) -> list[dict]:
+) -> list[MemoryRow]:
     active_clause = "" if include_inactive else "AND active = true"
     sql = sa_text(f"""
         SELECT id, type, key, value, confidence, session_id, source_turn_id, created_at, updated_at,
@@ -39,10 +40,12 @@ async def fetch_scope_memories(
         ORDER BY active DESC, created_at DESC
     """)
     result = await db.execute(sql, {"user_id": user_id, "session_id": session_id})
-    return [dict(r) for r in result.mappings().all()]
+    return [MemoryRow.from_mapping(r) for r in result.mappings().all()]
 
 
-async def fetch_recent_turns(db: AsyncSession, session_id: str, limit: int = 5) -> list[dict]:
+async def fetch_recent_turns(
+    db: AsyncSession, session_id: str, limit: int = 5
+) -> list[RecentTurnRow]:
     sql = sa_text("""
         SELECT id, content_text, timestamp
         FROM turns
@@ -51,7 +54,7 @@ async def fetch_recent_turns(db: AsyncSession, session_id: str, limit: int = 5) 
         LIMIT :limit
     """)
     result = await db.execute(sql, {"session_id": session_id, "limit": limit})
-    return [dict(r) for r in result.mappings().all()]
+    return [RecentTurnRow.from_mapping(r) for r in result.mappings().all()]
 
 
 async def fetch_user_memory_models(db: AsyncSession, user_id: str) -> list[Memory]:

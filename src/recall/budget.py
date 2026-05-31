@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from src.storage.rows import MemoryRow, RecentTurnRow
+
 FACT_SHARE = 0.50
 PREFERENCE_SHARE = 0.25
 MAX_FACTS = 15
@@ -23,16 +25,16 @@ class TierResult:
 
 
 def assemble_context(
-    memories: list[dict], recent_turns: list[dict], max_tokens: int
+    memories: list[MemoryRow], recent_turns: list[RecentTurnRow], max_tokens: int
 ) -> tuple[str, list[dict]]:
     """Assemble Context with explicit tier budgets."""
     remaining = max_tokens
     sections: list[str] = []
     citations: list[dict] = []
 
-    facts = [m for m in memories if m["type"] == "fact"]
-    preferences = [m for m in memories if m["type"] == "preference"]
-    others = [m for m in memories if m["type"] in ("opinion", "event")]
+    facts = [m for m in memories if m.type == "fact"]
+    preferences = [m for m in memories if m.type == "preference"]
+    others = [m for m in memories if m.type in ("opinion", "event")]
 
     fact_result = take_tier(
         memory_lines(facts[:MAX_FACTS], format_fact_line),
@@ -100,29 +102,29 @@ def take_tier(
     return TierResult(selected, citations, spent)
 
 
-def memory_lines(memories: list[dict], formatter) -> list[ContextLine]:
+def memory_lines(memories: list[MemoryRow], formatter) -> list[ContextLine]:
     return [
         ContextLine(
             text=formatter(memory),
             citation={
-                "turn_id": memory["source_turn_id"],
-                "score": memory.get("rrf_score", 0),
-                "snippet": memory["value"],
+                "turn_id": memory.source_turn_id,
+                "score": memory.rrf_score,
+                "snippet": memory.value,
             },
         )
         for memory in memories
     ]
 
 
-def recent_lines(recent_turns: list[dict]) -> list[ContextLine]:
+def recent_lines(recent_turns: list[RecentTurnRow]) -> list[ContextLine]:
     lines = []
     for turn in recent_turns:
-        text = turn["content_text"][:200]
+        text = turn.content_text[:200]
         lines.append(
             ContextLine(
-                text=f"- [{str(turn.get('timestamp', ''))[:10]}] {text}",
+                text=f"- [{str(turn.timestamp or '')[:10]}] {text}",
                 citation={
-                    "turn_id": turn["id"],
+                    "turn_id": turn.id,
                     "score": 0.0,
                     "snippet": text[:100],
                 },
@@ -131,21 +133,21 @@ def recent_lines(recent_turns: list[dict]) -> list[ContextLine]:
     return lines
 
 
-def format_fact_line(memory: dict) -> str:
-    if memory.get("active") is False:
-        return f"- Previously: {memory['value']}"
+def format_fact_line(memory: MemoryRow) -> str:
+    if memory.active is False:
+        return f"- Previously: {memory.value}"
     line = format_memory_line(memory)
-    if memory.get("updated_at"):
-        line += f" (updated {str(memory['updated_at'])[:10]})"
+    if memory.updated_at:
+        line += f" (updated {str(memory.updated_at)[:10]})"
     return line
 
 
-def format_memory_line(memory: dict) -> str:
-    return f"- {memory['value']}"
+def format_memory_line(memory: MemoryRow) -> str:
+    return f"- {memory.value}"
 
 
-def format_relevant_line(memory: dict) -> str:
-    return f"- [{str(memory.get('created_at', ''))[:10]}] {memory['value']}"
+def format_relevant_line(memory: MemoryRow) -> str:
+    return f"- [{str(memory.created_at or '')[:10]}] {memory.value}"
 
 
 def estimate_tokens(text: str) -> int:

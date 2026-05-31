@@ -1,5 +1,6 @@
 from src.recall.budget import assemble_context
 from src.recall.planning import build_recall_plan, select_recall_memories
+from src.storage.rows import MemoryRow
 
 
 def memory(
@@ -10,22 +11,20 @@ def memory(
     type_: str = "fact",
     active: bool = True,
     score: float = 0.1,
-) -> dict:
-    return {
-        "id": id_,
-        "type": type_,
-        "key": key,
-        "value": value,
-        "confidence": 1.0,
-        "session_id": "session-1",
-        "source_turn_id": f"turn-{id_}",
-        "created_at": "2025-03-01T10:00:00",
-        "updated_at": "2025-03-01T10:00:00",
-        "active": active,
-        "supersedes": None,
-        "superseded_by": None,
-        "rrf_score": score,
-    }
+) -> MemoryRow:
+    return MemoryRow(
+        id=id_,
+        type=type_,
+        key=key,
+        value=value,
+        confidence=1.0,
+        session_id="session-1",
+        source_turn_id=f"turn-{id_}",
+        created_at="2025-03-01T10:00:00",
+        updated_at="2025-03-01T10:00:00",
+        active=active,
+        rrf_score=score,
+    )
 
 
 def test_noise_gate_rejects_unknown_specific_query():
@@ -68,7 +67,7 @@ def test_anchor_expansion_links_pet_and_location():
         [pet, location, employment],
     )
 
-    values = [m["value"] for m in selected]
+    values = [m.value for m in selected]
     assert "Has a dog named Biscuit" in values
     assert "Lives in Berlin" in values
     assert "Works at Notion as a PM" not in values

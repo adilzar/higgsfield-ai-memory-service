@@ -12,6 +12,10 @@ _Avoid_: Message batch, chat chunk
 Structured knowledge extracted from a Turn, with type, key, value, confidence, provenance, and active/supersession state.
 _Avoid_: Raw chunk, note, embedding record
 
+**Memory Row**:
+Typed in-process representation of Memory data selected from storage and passed through Recall, Search, and Context assembly.
+_Avoid_: Untyped row dict, raw mapping
+
 **Memory Lifecycle**:
 Rules that preserve Memory active state and supersession links when Turns, Sessions, or Users are deleted.
 _Avoid_: Cleanup, cascade logic

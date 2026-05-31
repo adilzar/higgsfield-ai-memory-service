@@ -8,6 +8,7 @@ from src.core.embeddings import embed_text
 from src.recall.budget import assemble_context
 from src.recall.planning import build_recall_plan, needs_history
 from src.recall.retrieval import hybrid_search_memories
+from src.storage.rows import MemoryRow
 from src.storage.store import fetch_recent_turns, fetch_scope_memories
 
 
@@ -21,7 +22,7 @@ class RecallContextCommand:
 
 async def hybrid_retrieve(
     db: AsyncSession, query: str, user_id: str | None, session_id: str, limit: int = 20
-) -> list[dict]:
+) -> list[MemoryRow]:
     """Hybrid retrieval: vector similarity + full-text search, fused with RRF."""
     query_embedding = embed_text(query)
     return await hybrid_search_memories(db, query, query_embedding, user_id, session_id, limit)

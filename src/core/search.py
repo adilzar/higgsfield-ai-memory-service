@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.embeddings import embed_text
 from src.recall.retrieval import hybrid_search_filtered_memories
+from src.storage.rows import MemoryRow
 
 
 @dataclass(frozen=True)
@@ -29,11 +30,11 @@ async def search_memories(db: AsyncSession, cmd: SearchMemoriesCommand) -> list[
     return [format_search_result(row) for row in rows]
 
 
-def format_search_result(row: dict) -> dict:
+def format_search_result(row: MemoryRow) -> dict:
     return {
-        "content": row["value"],
-        "score": round(float(row["rrf_score"]), 4),
-        "session_id": row["session_id"],
-        "timestamp": row["created_at"].isoformat() if row["created_at"] else None,
-        "metadata": {"type": row["type"], "key": row["key"]},
+        "content": row.value,
+        "score": round(float(row.rrf_score), 4),
+        "session_id": row.session_id,
+        "timestamp": row.created_at.isoformat() if row.created_at else None,
+        "metadata": {"type": row.type, "key": row.key},
     }

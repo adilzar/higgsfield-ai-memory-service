@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from src.storage.rows import MemoryRow
+
 STOPWORDS = {
     "about",
     "are",
@@ -96,26 +98,28 @@ class QueryProfile:
 
 @dataclass(frozen=True)
 class RecallPlan:
-    memories: list[dict]
+    memories: list[MemoryRow]
     query: QueryProfile
     expansion_intents: frozenset[str]
 
 
-def build_recall_plan(query: str, retrieved: list[dict], scope_memories: list[dict]) -> RecallPlan:
+def build_recall_plan(
+    query: str, retrieved: list[MemoryRow], scope_memories: list[MemoryRow]
+) -> RecallPlan:
     """Plan deterministic Recall policy for a query and candidate Memory rows."""
     query_profile = _profile_query(query)
-    selected: list[dict] = []
+    selected: list[MemoryRow] = []
     selected_ids: set[str] = set()
 
-    def add(memory: dict) -> None:
-        mid = memory["id"]
+    def add(memory: MemoryRow) -> None:
+        mid = memory.id
         if mid not in selected_ids:
             selected.append(memory)
             selected_ids.add(mid)
 
     if query_profile.is_profile_query:
         for memory in scope_memories:
-            if memory.get("active") is True and _memory_intents(memory) & STABLE_INTENTS:
+            if memory.active is True and _memory_intents(memory) & STABLE_INTENTS:
                 add(memory)
         return RecallPlan(
             memories=selected,
@@ -134,7 +138,7 @@ def build_recall_plan(query: str, retrieved: list[dict], scope_memories: list[di
 
     if query_profile.intents:
         for memory in scope_memories:
-            if memory.get("active") is False:
+            if memory.active is False:
                 continue
             if _memory_intents(memory) & query_profile.intents:
                 add(memory)
@@ -154,7 +158,7 @@ def build_recall_plan(query: str, retrieved: list[dict], scope_memories: list[di
         expansion_intents.update({"employment", "location", "opinion"})
 
     for memory in scope_memories:
-        if memory.get("active") is False and not query_profile.include_history:
+        if memory.active is False and not query_profile.include_history:
             continue
         if _memory_intents(memory) & expansion_intents:
             add(memory)
@@ -167,8 +171,8 @@ def build_recall_plan(query: str, retrieved: list[dict], scope_memories: list[di
 
 
 def select_recall_memories(
-    query: str, retrieved: list[dict], scope_memories: list[dict]
-) -> list[dict]:
+    query: str, retrieved: list[MemoryRow], scope_memories: list[MemoryRow]
+) -> list[MemoryRow]:
     return build_recall_plan(query, retrieved, scope_memories).memories
 
 
@@ -183,19 +187,21 @@ def _profile_query(query: str) -> QueryProfile:
     )
 
 
-def _memory_matches_query(memory: dict, query_tokens: set[str], query_intents: set[str]) -> bool:
-    if memory.get("vec_score") and float(memory["vec_score"]) >= VEC_SCORE_THRESHOLD:
+def _memory_matches_query(
+    memory: MemoryRow, query_tokens: set[str], query_intents: set[str]
+) -> bool:
+    if memory.vec_score and memory.vec_score >= VEC_SCORE_THRESHOLD:
         return True
 
-    if memory.get("fts_score", 0) and float(memory["fts_score"]) > 0:
+    if memory.fts_score and memory.fts_score > 0:
         return True
 
     memory_tokens = _tokens(
         " ".join(
             [
-                str(memory.get("key", "")),
-                str(memory.get("type", "")),
-                str(memory.get("value", "")),
+                memory.key,
+                memory.type,
+                memory.value,
             ]
         )
     )
@@ -213,9 +219,9 @@ def _intents_for_query(query: str) -> set[str]:
     return query_intents
 
 
-def _memory_intents(memory: dict) -> set[str]:
-    key = str(memory.get("key", "")).lower()
-    memory_type = str(memory.get("type", "")).lower()
+def _memory_intents(memory: MemoryRow) -> set[str]:
+    key = memory.key.lower()
+    memory_type = memory.type.lower()
     intents: set[str] = set()
 
     if any(part in key for part in ("location", "city", "home", "moved")):
