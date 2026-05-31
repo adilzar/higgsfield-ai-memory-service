@@ -2,13 +2,13 @@ services:
   db:
     image: pgvector/pgvector:pg16
     environment:
-      POSTGRES_DB: memory
-      POSTGRES_USER: memory
-      POSTGRES_PASSWORD: memory
+      POSTGRES_DB: ${DB_NAME:-memory}
+      POSTGRES_USER: ${DB_USER:-memory}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-memory}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U memory"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-memory}"]
       interval: 2s
       timeout: 3s
       retries: 10
@@ -20,8 +20,11 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://memory:memory@db:5432/memory
-      DATABASE_URL_SYNC: postgresql://memory:memory@db:5432/memory
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-memory}
+      DB_USER: ${DB_USER:-memory}
+      DB_PASSWORD: ${DB_PASSWORD:-memory}
     depends_on:
       db:
         condition: service_healthy
