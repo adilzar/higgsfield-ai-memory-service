@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from src.config import settings
+from src.core.config import settings
 
 PUBLIC_PATHS = frozenset({"/health"})
 

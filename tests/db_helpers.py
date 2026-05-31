@@ -8,8 +8,8 @@ from uuid import uuid4
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database import async_session, init_db
-from src.models import Memory, Turn
+from src.storage.database import async_session, init_db
+from src.storage.models import Memory, Turn
 
 
 @dataclass(frozen=True)

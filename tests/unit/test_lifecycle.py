@@ -1,7 +1,7 @@
 import pytest
 
-from src.lifecycle import delete_session_data
-from src.models import Memory
+from src.core.lifecycle import delete_session_data
+from src.storage.models import Memory
 from tests.db_helpers import db_scenario
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")

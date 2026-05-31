@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.embeddings import embed_text
+from src.core.embeddings import embed_text
 from src.recall.retrieval import hybrid_search_filtered_memories
 
 

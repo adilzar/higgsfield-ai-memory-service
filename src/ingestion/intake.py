@@ -7,11 +7,11 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.embeddings import embed_text
-from src.extraction import ExtractionError, extract_memories
-from src.memory_write import MemoryWriteContext, memory_refs, persist_extracted_memories
-from src.models import Turn
-from src.store import fetch_active_memory_models
+from src.core.embeddings import embed_text
+from src.ingestion.extraction import ExtractionError, extract_memories
+from src.ingestion.memory_write import MemoryWriteContext, memory_refs, persist_extracted_memories
+from src.storage.models import Turn
+from src.storage.store import fetch_active_memory_models
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from src.search import format_search_result
+from src.core.search import format_search_result
 
 
 def test_format_search_result_preserves_contract_shape():

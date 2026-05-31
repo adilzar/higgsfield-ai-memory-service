@@ -1,6 +1,6 @@
 from sentence_transformers import SentenceTransformer
 
-from src.config import settings
+from src.core.config import settings
 
 _model = None
 

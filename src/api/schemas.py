@@ -5,10 +5,10 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from src.intake import IngestTurnCommand, TurnMessage
-from src.models import Memory
+from src.ingestion.intake import IngestTurnCommand, TurnMessage
+from src.storage.models import Memory
 from src.recall import RecallContextCommand
-from src.search import SearchMemoriesCommand
+from src.core.search import SearchMemoriesCommand
 
 
 class Message(BaseModel):

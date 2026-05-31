@@ -1,6 +1,6 @@
 import pytest
 
-from src.extraction import (
+from src.ingestion.extraction import (
     ExtractedMemory,
     ExtractionError,
     extract_memories,

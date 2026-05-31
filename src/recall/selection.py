@@ -4,11 +4,11 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.embeddings import embed_text
+from src.core.embeddings import embed_text
 from src.recall.budget import assemble_context
 from src.recall.planning import build_recall_plan, needs_history
 from src.recall.retrieval import hybrid_search_memories
-from src.store import fetch_recent_turns, fetch_scope_memories
+from src.storage.store import fetch_recent_turns, fetch_scope_memories
 
 
 @dataclass(frozen=True)

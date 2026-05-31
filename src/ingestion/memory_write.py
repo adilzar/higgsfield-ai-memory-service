@@ -6,9 +6,9 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.embeddings import embed_texts
-from src.extraction import ExtractedMemory
-from src.models import Memory
+from src.core.embeddings import embed_texts
+from src.ingestion.extraction import ExtractedMemory
+from src.storage.models import Memory
 
 
 @dataclass(frozen=True)

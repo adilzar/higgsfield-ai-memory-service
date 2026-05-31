@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models import Memory, Turn
+from src.storage.models import Memory, Turn
 
 
 async def delete_session_data(db: AsyncSession, session_id: str) -> None:

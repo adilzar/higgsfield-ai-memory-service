@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy import text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models import Memory
+from src.storage.models import Memory
 
 
 async def fetch_active_memory_models(

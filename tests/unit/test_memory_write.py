@@ -2,8 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.extraction import ExtractedMemory
-from src.memory_write import MemoryWriteContext, memory_refs, persist_extracted_memories
+from src.ingestion.extraction import ExtractedMemory
+from src.ingestion.memory_write import MemoryWriteContext, memory_refs, persist_extracted_memories
 
 
 def test_memory_refs_exposes_extraction_context():
