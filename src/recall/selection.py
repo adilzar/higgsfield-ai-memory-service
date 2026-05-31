@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.embeddings import embed_text
-from src.recall.budget import assemble_context
+from src.recall.budget import RecallContext, assemble_context
 from src.recall.planning import build_recall_plan, needs_history
 from src.recall.retrieval import hybrid_search_memories
 from src.storage.rows import MemoryRow
@@ -31,7 +31,7 @@ async def hybrid_retrieve(
 async def build_recall_context(
     db: AsyncSession,
     cmd: RecallContextCommand,
-) -> tuple[str, list[dict]]:
+) -> RecallContext:
     """Build prompt Context and Citations for /recall."""
     include_inactive = needs_history(cmd.query)
     retrieved = await hybrid_retrieve(db, cmd.query, cmd.user_id, cmd.session_id)
@@ -39,7 +39,7 @@ async def build_recall_context(
     plan = build_recall_plan(cmd.query, retrieved, scope_memories)
 
     if not plan.memories:
-        return "", []
+        return RecallContext.empty()
 
     recent = await fetch_recent_turns(db, cmd.session_id)
     return assemble_context(plan.memories, recent, cmd.max_tokens)

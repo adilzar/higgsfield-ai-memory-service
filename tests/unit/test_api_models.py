@@ -1,6 +1,7 @@
 from datetime import datetime
 from types import SimpleNamespace
 
+from src.api.routes import format_recall_response
 from src.api.schemas import (
     RecallRequest,
     SearchRequest,
@@ -10,7 +11,7 @@ from src.api.schemas import (
 )
 from src.core.search import SearchMemoriesCommand
 from src.ingestion.intake import IngestTurnCommand, TurnMessage
-from src.recall import RecallContextCommand
+from src.recall import Citation, RecallContext, RecallContextCommand
 
 
 def test_turn_request_builds_ingest_command():
@@ -104,3 +105,19 @@ def test_format_user_memories_preserves_public_contract():
 
 def test_format_timestamp_allows_missing_timestamps():
     assert format_timestamp(None) is None
+
+
+def test_format_recall_response_preserves_public_contract():
+    context = RecallContext(
+        text="## Known facts\n- Lives in Berlin",
+        citations=(Citation(turn_id="turn-1", score=0.1, snippet="Lives in Berlin"),),
+    )
+
+    assert format_recall_response(context) == {
+        "context": "## Known facts\n- Lives in Berlin",
+        "citations": [{"turn_id": "turn-1", "score": 0.1, "snippet": "Lives in Berlin"}],
+    }
+
+
+def test_format_recall_response_preserves_empty_contract():
+    assert format_recall_response(RecallContext.empty()) == {"context": "", "citations": []}

@@ -12,25 +12,42 @@ MAX_RELEVANT = 10
 
 
 @dataclass(frozen=True)
+class Citation:
+    turn_id: str
+    score: float
+    snippet: str
+
+
+@dataclass(frozen=True)
+class RecallContext:
+    text: str
+    citations: tuple[Citation, ...] = ()
+
+    @classmethod
+    def empty(cls) -> "RecallContext":
+        return cls(text="", citations=())
+
+
+@dataclass(frozen=True)
 class ContextLine:
     text: str
-    citation: dict
+    citation: Citation
 
 
 @dataclass
 class TierResult:
     lines: list[str]
-    citations: list[dict]
+    citations: list[Citation]
     spent: int
 
 
 def assemble_context(
     memories: list[MemoryRow], recent_turns: list[RecentTurnRow], max_tokens: int
-) -> tuple[str, list[dict]]:
+) -> RecallContext:
     """Assemble Context with explicit tier budgets."""
     remaining = max_tokens
     sections: list[str] = []
-    citations: list[dict] = []
+    citations: list[Citation] = []
 
     facts = [m for m in memories if m.type == "fact"]
     preferences = [m for m in memories if m.type == "preference"]
@@ -76,7 +93,7 @@ def assemble_context(
         sections.append("## Recent conversation context\n" + "\n".join(recent_result.lines))
         citations.extend(recent_result.citations)
 
-    return "\n\n".join(sections), citations
+    return RecallContext(text="\n\n".join(sections), citations=tuple(citations))
 
 
 def take_tier(
@@ -86,7 +103,7 @@ def take_tier(
     min_items: int = 0,
 ) -> TierResult:
     selected: list[str] = []
-    citations: list[dict] = []
+    citations: list[Citation] = []
     spent = 0
 
     for line in lines:
@@ -106,11 +123,11 @@ def memory_lines(memories: list[MemoryRow], formatter) -> list[ContextLine]:
     return [
         ContextLine(
             text=formatter(memory),
-            citation={
-                "turn_id": memory.source_turn_id,
-                "score": memory.rrf_score,
-                "snippet": memory.value,
-            },
+            citation=Citation(
+                turn_id=memory.source_turn_id,
+                score=memory.rrf_score,
+                snippet=memory.value,
+            ),
         )
         for memory in memories
     ]
@@ -123,11 +140,11 @@ def recent_lines(recent_turns: list[RecentTurnRow]) -> list[ContextLine]:
         lines.append(
             ContextLine(
                 text=f"- [{str(turn.timestamp or '')[:10]}] {text}",
-                citation={
-                    "turn_id": turn.id,
-                    "score": 0.0,
-                    "snippet": text[:100],
-                },
+                citation=Citation(
+                    turn_id=turn.id,
+                    score=0.0,
+                    snippet=text[:100],
+                ),
             )
         )
     return lines

@@ -151,9 +151,10 @@ Context is assembled in priority order, stopping when `max_tokens` is reached:
 
 **Budget logic:** When `max_tokens` is tight, facts get priority positioning. Within each tier, items are capped (15 facts, 10 preferences, 10 relevant). Recent context is last priority and gets cut first.
 
-Internally, Recall, Search, and Context assembly use typed `MemoryRow` and
-`RecentTurnRow` interfaces instead of raw database row dictionaries. HTTP
-responses remain plain JSON at the route seam.
+Internally, Recall, Search, and Context assembly use typed `MemoryRow`,
+`RecentTurnRow`, `RecallContext`, and `Citation` interfaces instead of raw
+database row dictionaries or citation dictionaries. HTTP responses remain
+plain JSON at the route seam.
 
 ## Fact Evolution
 

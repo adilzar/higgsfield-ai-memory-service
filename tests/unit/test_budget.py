@@ -1,4 +1,4 @@
-from src.recall.budget import assemble_context, estimate_tokens
+from src.recall.budget import Citation, assemble_context, estimate_tokens
 from src.storage.rows import MemoryRow, RecentTurnRow
 
 
@@ -34,11 +34,11 @@ def test_tight_budget_keeps_fact_before_recent_turn():
         )
     ]
 
-    context, citations = assemble_context(memories, recent_turns, max_tokens=12)
+    context = assemble_context(memories, recent_turns, max_tokens=12)
 
-    assert "Lives in Berlin" in context
-    assert "Recent conversation context" not in context
-    assert citations == [{"turn_id": "turn-1", "score": 0.1, "snippet": "Lives in Berlin"}]
+    assert "Lives in Berlin" in context.text
+    assert "Recent conversation context" not in context.text
+    assert context.citations == (Citation(turn_id="turn-1", score=0.1, snippet="Lives in Berlin"),)
 
 
 def test_budget_policy_caps_preferences_before_relevant_memories():
@@ -52,11 +52,11 @@ def test_budget_policy_caps_preferences_before_relevant_memories():
         ),
     ]
 
-    context, _ = assemble_context(memories, [], max_tokens=24)
+    context = assemble_context(memories, [], max_tokens=24)
 
-    assert "Lives in Berlin" in context
-    assert "Prefers concise answers" in context
-    assert "TypeScript is fine" not in context
+    assert "Lives in Berlin" in context.text
+    assert "Prefers concise answers" in context.text
+    assert "TypeScript is fine" not in context.text
 
 
 def test_estimate_tokens_is_stable_for_budget_assertions():

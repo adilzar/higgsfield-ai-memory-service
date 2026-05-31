@@ -13,7 +13,7 @@ from src.api.schemas import (
 from src.core.lifecycle import delete_session_data, delete_user_data
 from src.core.search import search_memories
 from src.ingestion.intake import ingest_turn
-from src.recall import build_recall_context
+from src.recall import RecallContext, build_recall_context
 from src.storage.database import get_db
 from src.storage.store import fetch_user_memory_models
 
@@ -33,8 +33,8 @@ async def create_turn(req: TurnRequest, db: AsyncSession = Depends(get_db)):
 
 @router.post("/recall")
 async def recall(req: RecallRequest, db: AsyncSession = Depends(get_db)):
-    context, citations = await build_recall_context(db, req.to_command())
-    return {"context": context, "citations": citations}
+    context = await build_recall_context(db, req.to_command())
+    return format_recall_response(context)
 
 
 @router.post("/search")
@@ -59,3 +59,17 @@ async def delete_session(session_id: str, db: AsyncSession = Depends(get_db)):
 async def delete_user(user_id: str, db: AsyncSession = Depends(get_db)):
     await delete_user_data(db, user_id)
     return None
+
+
+def format_recall_response(context: RecallContext) -> dict:
+    return {
+        "context": context.text,
+        "citations": [
+            {
+                "turn_id": citation.turn_id,
+                "score": citation.score,
+                "snippet": citation.snippet,
+            }
+            for citation in context.citations
+        ],
+    }

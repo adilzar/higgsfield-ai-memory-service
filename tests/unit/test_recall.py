@@ -82,10 +82,10 @@ def test_history_query_can_surface_inactive_previous_memory():
         [current],
         [current, previous],
     )
-    context, _ = assemble_context(selected, [], 512)
+    context = assemble_context(selected, [], 512)
 
-    assert "Works at Notion as a PM" in context
-    assert "Previously: Worked at Stripe as an engineer" in context
+    assert "Works at Notion as a PM" in context.text
+    assert "Previously: Worked at Stripe as an engineer" in context.text
 
 
 def test_profile_query_returns_active_stable_memories_only():
